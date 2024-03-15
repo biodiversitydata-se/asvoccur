@@ -38,7 +38,7 @@ These lists are returned as elements of a parent list.
 To access individual dataset tables:
 \describe{
   \item{\code{loaded <- load_data(data_path = './datasets')}}{}
-  \item{\code{View(loaded$asv_tables$`[datasetID]`)}}{ # OR:}
+  \item{\code{View(loaded$asv_tables$`some-datasetID`)}}{ # OR:}
   \item{\code{View(loaded$asvs[[1]])}}{}
 }
 }

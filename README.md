@@ -5,10 +5,9 @@ Tools for ASV occurrence data in SBDI
 ```R
 # install.packages('devtools')
 # install.packages('data.table')
-install_github("pragermh/asvoccur")
-
-library(data.table)
 library(devtools)
+install_github("pragermh/asvoccur")
+library(data.table)
 library(asvoccur)
 ```
 ## Run

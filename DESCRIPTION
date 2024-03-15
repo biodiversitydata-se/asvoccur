@@ -3,7 +3,6 @@ Type: Package
 Title: Tools for ASV occurrence data in SBDI
 Version: 0.1.0
 Author: The SBDI Molecular Data Team
-Maintainer: The SBDI Molecular Data Team <https://docs.biodiversitydata.se/support/>
 Description: A simple R package for handling ASV occurrence data in SBDI
 Imports:
     data.table

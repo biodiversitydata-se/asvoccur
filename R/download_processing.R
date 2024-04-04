@@ -48,15 +48,19 @@ load_data <- function(data_path = './datasets') {
   
   # Reads & reshapes occurrence.tsv into wide (taxonID x eventID) format
   build_asv_table <- function(zip) {
-    occurrence <- fread(cmd = paste('unzip -p', zip, 'occurrence.tsv'))
+  occurrence <- fread(cmd = paste('unzip -p', zip, 'occurrence.tsv'))
     asv_table <- dcast(occurrence, taxonID ~ eventID,
                        value.var = "organismQuantity", fill = 0)
+    setkey(asv_table, taxonID)
+    # Set counts to integer
+    asv_table[, names(asv_table)[-1] := lapply(.SD, as.integer), .SDcols = -1]
     return(asv_table)
   }
   
   # Reads ASV sequence and taxonomy from asv.tsv
   get_asvs <- function(zip) {
     asv <- fread(cmd = paste('unzip -p', zip, 'asv.tsv'))
+    setkey(asv, taxonID)
     return(asv)
   }
   

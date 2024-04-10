@@ -1,6 +1,5 @@
-library(data.table)
-.datatable.aware = TRUE  # To ensure that e.g. := operates as expected
-
+#' @import data.table
+NULL
 #' Read and reshape downloaded ASV occurrence data
 #'
 #' Read and reshape Amplicon Sequence Variant (ASV) occurrence data from

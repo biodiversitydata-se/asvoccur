@@ -1,5 +1,5 @@
-#' @import data.table
-NULL
+#' @importFrom data.table data.table fread dcast setkey setnames `:=`
+NULL  # Stops roxygen2 from importing title
 #' Read and reshape downloaded ASV occurrence data
 #'
 #' Read and reshape Amplicon Sequence Variant (ASV) occurrence data from
@@ -73,7 +73,6 @@ load_data <- function(data_path = './datasets') {
       message("Adding empty emof table for ", gsub(".zip", "", zip))
       return(data.table("measurementType (measurementUnit)" = character()))
     }
-    emof <- data.table(emof)
     # Convert all cols to char, to not add unwanted decimals during dcast
     emof[, names(emof) := lapply(.SD, as.character)]
 

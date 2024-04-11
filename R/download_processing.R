@@ -1,5 +1,3 @@
-#' @importFrom data.table data.table fread dcast setkey setnames `:=`
-NULL  # Stops roxygen2 from importing title
 #' Read and reshape downloaded ASV occurrence data
 #'
 #' Read and reshape Amplicon Sequence Variant (ASV) occurrence data from
@@ -35,6 +33,7 @@ NULL  # Stops roxygen2 from importing title
 #' }
 #' @export
 load_data <- function(data_path = './datasets') {
+  
   # Locate datasets
   if (!dir.exists(data_path)) {
     stop(paste("Path of dataset directory:", data_path, "was not found."))
@@ -47,7 +46,7 @@ load_data <- function(data_path = './datasets') {
   
   # Reads & reshapes occurrence.tsv into wide (taxonID x eventID) format
   build_asv_table <- function(zip) {
-  occurrence <- fread(cmd = paste('unzip -p', zip, 'occurrence.tsv'))
+    occurrence <- fread(cmd = paste('unzip -p', zip, 'occurrence.tsv'))
     asv_table <- dcast(occurrence, taxonID ~ eventID,
                        value.var = "organismQuantity", fill = 0)
     setkey(asv_table, taxonID)
@@ -93,12 +92,12 @@ load_data <- function(data_path = './datasets') {
 #' 
 #' Merge ASV/EMOF tables and asvs from different datasets previously loaded with
 #' \code{load_data()} function.
-#' @param loaded_list A list of three sublists (\code{asv_tables}, \code{asvs},
+#' @param loaded A list of three sublists (\code{asv_tables}, \code{asvs},
 #' \code{emof_tables}) from \code{load_data()} function.
 #' @return A list of three data.table elements (\code{asv_table}, \code{asvs},
 #' \code{emof_table}) containing data merged from loaded datasets.
 #' @usage 
-#' merge_tables(loaded_list);
+#' merge_data(loaded);
 #' @details 
 #' The function takes the output from \code{load_data()} and merges rows from
 #' different ASV occurrence datasets into three data.table objects:
@@ -140,8 +139,3 @@ merge_data <- function(loaded) {
   }, loaded$asvs)
   return(merged)
 }
-
-
-
-
-

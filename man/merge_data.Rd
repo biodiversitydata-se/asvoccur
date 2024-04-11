@@ -4,10 +4,10 @@
 \alias{merge_data}
 \title{Merge data from different ASV occurrence datasets}
 \usage{
-merge_tables(loaded_list);
+merge_data(loaded);
 }
 \arguments{
-\item{loaded_list}{A list of three sublists (\code{asv_tables}, \code{asvs},
+\item{loaded}{A list of three sublists (\code{asv_tables}, \code{asvs},
 \code{emof_tables}) from \code{load_data()} function.}
 }
 \value{

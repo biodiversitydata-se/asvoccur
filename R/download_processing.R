@@ -1,35 +1,51 @@
-#' Read and reshape downloaded ASV occurrence data
+#' Load downloaded ASV occurrence data
 #'
-#' Read and reshape Amplicon Sequence Variant (ASV) occurrence data from
-#' 'Darwin Core (DwC)-like' archives downloaded from the Swedish ASP portal, 
+#' Load Amplicon Sequence Variant (ASV) occurrence data from 'Darwin
+#' Core (DwC)-like' archives downloaded from the Swedish ASP portal,
 #' \url{https://asv-portal.biodiversitydata.se/}.
 #' @param data_path Path of directory containing dataset (*.zip) files
-#' @return A list of three sublists (\code{asv_tables}, \code{asvs},
-#' \code{emof_tables}) containing data.table elements from each dataset, 
-#' indexed by \code{datasetID}.
-#' @usage 
-#' load_data(data_path = './datasets');
-#' @details 
-#' The function reads text files (\code{occurrence/asv/emof.tsv}) from compressed
-#' archives (\code{[datasetID].zip}), and repackages data into three 
-#' data.table objects per dataset:
-#' 
-#' \enumerate{
-#'   \item ASV-table: Read counts in a \code{taxonID} [row] x \code{eventID} [col] matrix.
-#'   \item asvs: \code{asv_sequence}, and taxonomy columns per \code{taxonID}.
-#'   \item EMOF-table: Contextual parameter values (\code{measurementValue}) in a
-#'     \code{measurementType} (\code{measurementUnit}) x \code{eventID} matrix.
+#' @return A list of four sublists (\code{counts}, \code{asvs}, \code{events},
+#'   \code{emof}) containing data.table elements from each dataset, indexed by
+#'   \code{datasetID}.
+#' @usage load_data(data_path = './datasets');
+#' @details Reads data from one or more compressed archives. Returns a list of
+#'   sub lists, each of which contains data.table objects (dt:s) from each
+#'   included dataset:
+#'
+#' \itemize{
+#'   \item \strong{counts}: List of dt:s representing read counts
+#'     (\code{taxonID} [row] x \code{eventID} [col] matrix) from each dataset.
+#'     \itemize{
+#'       \item \code{`first-datasetID`} (dt)
+#'       \item \code{`second-datasetID`} (dt)
+#'     }
+#'
+#'   \item \strong{asvs}: List of dt:s representing `asv_sequence` and taxonomy
+#'     per \code{taxonID} from each dataset.
+#'     \itemize{
+#'       \item ...
+#'     }
+#'
+#'  \item \strong{event}: List of dt:s representing basic event/sample metadata
+#'     in a parameter [row] x \code{eventID} [col] matrix from each dataset.
+#'     \itemize{
+#'       \item ...
+#'     }
+#'
+#'   \item \strong{emof}: List of dt:s representing additional contextual
+#'     parameter values (\code{measurementValue}) in a \code{measurementType}
+#'     [row] x \code{eventID} [col] matrix from each dataset.
+#'     \itemize{
+#'       \item ...
+#'     }
 #' }
-#' 
-#' Tables from different datasets are indexed by their respective \code{datasetID},
-#' and organized into three lists (\code{asv_tables}, \code{asvs}, \code{emof_tables}).
-#' These lists are returned as elements of a parent list.
-#' 
+#'
 #' To access individual dataset tables:
 #' \describe{
 #'   \item{\code{loaded <- load_data(data_path = './datasets')}}{}
-#'   \item{\code{View(loaded$asv_tables$`some-datasetID`)}}{ # OR:}
-#'   \item{\code{View(loaded$asvs[[1]])}}{}
+#'   \item{\code{View(loaded$counts$`first-datasetID`)}}{}
+#'   \item{\code{# OR:}}{}
+#'   \item{\code{View(loaded$counts[[1]])}}{}
 #' }
 #' @export
 load_data <- function(data_path = './datasets') {
@@ -45,27 +61,37 @@ load_data <- function(data_path = './datasets') {
   dirs <- gsub(".zip", "", basename(zip_files))
   
   # Reads & reshapes occurrence.tsv into wide (taxonID x eventID) format
-  build_asv_table <- function(zip) {
-    occurrence <- fread(cmd = paste('unzip -p', zip, 'occurrence.tsv'))
-    asv_table <- dcast(occurrence, taxonID ~ eventID,
+  get_counts <- function(zip) {
+    occurrences <- fread(cmd = paste('unzip -p', zip, 'occurrence.tsv'))
+    counts <- dcast(occurrences, taxonID ~ eventID,
                        value.var = "organismQuantity", fill = 0)
-    setkey(asv_table, taxonID)
+    setkey(counts, taxonID)
     # Set counts to integer
-    asv_table[, names(asv_table)[-1] := lapply(.SD, as.integer), .SDcols = -1]
-    return(asv_table)
+    counts[, names(counts)[-1] := lapply(.SD, as.integer), .SDcols = -1]
+    return(counts)
   }
   
   # Reads ASV sequence and taxonomy from asv.tsv
   get_asvs <- function(zip) {
-    asv <- fread(cmd = paste('unzip -p', zip, 'asv.tsv'))
-    setkey(asv, taxonID)
-    return(asv)
+    asvs <- fread(cmd = paste('unzip -p', zip, 'asv.tsv'))
+    setkey(asvs, taxonID)
+    return(asvs)
   }
   
-  # Reads & reshapes emof.tsv into wide format
+  # Reads and reshapes events.tsv
+  get_events <- function(zip) {
+    events <- fread(cmd = paste('unzip -p', zip, 'event.tsv')) # event x param
+    # Avoid data type warning when forcing parameters to share cols later
+    events[, names(events) := lapply(.SD, as.character)]
+    # Reshape into param x event
+    events <- transpose(events, make.names = "eventID", keep.names = "parameter")
+    return(events)
+  }
+  
+  # Reads & reshapes emof.tsv
   # (measurementType [measurementUnit] x eventID)
   # and drops remaining fields, e.g.measurementMethod & measurementRemarks!
-  build_emof_table <- function(zip) {
+  get_emof <- function(zip) {
     emof <- fread(cmd = paste('unzip -p', zip, 'emof.tsv'))
     # Handle datasets that have no contextual data
     if (nrow(emof) == 0) {
@@ -75,60 +101,78 @@ load_data <- function(data_path = './datasets') {
     # Convert all cols to char, to not add unwanted decimals during dcast
     emof[, names(emof) := lapply(.SD, as.character)]
 
-    emof_table <- dcast(emof, paste0(measurementType, " (", measurementUnit, ")")
+    emof <- dcast(emof, paste0(measurementType, " (", measurementUnit, ")")
                        ~ eventID, value.var = "measurementValue")
-    setnames(emof_table, "measurementType", "measurementType (measurementUnit)")
-    return(emof_table)
+    setnames(emof, "measurementType", "measurementType (measurementUnit)")
+    return(emof)
   }
   
   # Process data into data.table:s in (sub)lists, and return in parent list
   loaded <- list()
-  loaded$asv_tables <- setNames(lapply(zip_files, build_asv_table), dirs)
+  loaded$counts <- setNames(lapply(zip_files, get_counts), dirs)
   loaded$asvs <- setNames(lapply(zip_files, get_asvs), dirs)
-  loaded$emof_tables <- setNames(lapply(zip_files, build_emof_table), dirs)
+  loaded$events <- setNames(lapply(zip_files, get_events), dirs)
+  loaded$emof <- setNames(lapply(zip_files, get_emof), dirs)
   return(loaded)
 }
 #' Merge data from different ASV occurrence datasets 
 #' 
-#' Merge ASV/EMOF tables and asvs from different datasets previously loaded with
-#' \code{load_data()} function.
-#' @param loaded A list of three sublists (\code{asv_tables}, \code{asvs},
-#' \code{emof_tables}) from \code{load_data()} function.
-#' @return A list of three data.table elements (\code{asv_table}, \code{asvs},
-#' \code{emof_table}) containing data merged from loaded datasets.
-#' @usage 
-#' merge_data(loaded);
+#' Merge data from different datasets previously loaded with
+#' \code{\link[=load_data]{load_data()}} function.
+#' @param loaded A multidimensional list of ASV occurrence data.table
+#' elements loaded with \code{\link[=load_data]{load_data()}}.
+#' @param ds An optional character vector specifying the datasets
+#'   to merge. If excluded, all datasets will be merged.
+#' @return A list of four data.table elements (\code{counts}, \code{asvs},
+#' \code{events}, \code{emof}) containing data merged from loaded datasets.
+#' @usage merge_data(loaded, ds = NULL)
 #' @details 
-#' The function takes the output from \code{load_data()} and merges rows from
-#' different ASV occurrence datasets into three data.table objects:
+#' Takes the output from \code{\link[=load_data]{load_data()}} and merges data from
+#' different ASV occurrence datasets into four data.table objects:
 #' 
 #' \enumerate{
-#'   \item ASV-table: Read counts in a \code{taxonID} [row] x \code{eventID} [col] matrix.
-#'   \item asvs: \code{asv_sequence}, and taxonomy columns per \code{taxonID}.
-#'   \item EMOF-table: Contextual parameter values (\code{measurementValue}) in a
-#'     \code{measurementType} (\code{measurementUnit}) x \code{eventID} matrix.
+#'   \item \strong{counts}: Read counts in a \code{taxonID} [row] x 
+#'      \code{eventID} [col] matrix.
+#'   \item \strong{asvs}: \code{asv_sequence}, and taxonomy columns per
+#'     \code{taxonID}.
+#'   \item \strong{events}: Basic event metadata in a parameter [row] x
+#'     \code{eventID} [col] matrix.
+#'   \item \strong{emof}: Additional contextual parameter values
+#'     (\code{measurementValue}) in a \code{measurementType}
+#'     (\code{measurementUnit}) [row] x \code{eventID} [col] matrix.
 #' }
 #' 
-#' Merged ASV/EMOF tables include the UNION of unique rows
-#' (i.e. ASVs or measurements) and events (i.e. sequenced samples)
-#' from loaded datasets. Table asvs includes non-dataset-specific data, only, 
-#' so that we get a single row per unique ASV. Resulting data.table:s are
-#' returned as elements of list.
+#' Merged tables include the UNION of unique rows and events (i.e. sequenced
+#' samples) from loaded datasets. Table asvs includes non-dataset-specific data,
+#' only, so that we get a single row per unique ASV. Resulting tables are
+#' returned as elements of a list.
 #' 
 #' To access an individual table:
 #' \describe{
 #'   \item{\code{loaded <- load_data(data_path = './datasets')}}{}
-#'   \item{\code{merged <- load_data(loaded)}}{}
-#'   \item{\code{View(merged$asv_table)}}{}
+#'   \item{\code{merged <- merge_data(loaded)}}{}
+#'   \item{\code{View(merged$counts)}}{}
 #' }
 #' @export
-merge_data <- function(loaded) {
+merge_data <- function(loaded, ds = NULL) {
+  if (is.null(ds)) {
+    ds <- names(loaded$asvs)
+  } else if (!is.vector(ds) || 
+             length(ds) > length(intersect(ds, names(loaded$asvs)))) {
+    invalid_names <- ds[!(ds %in% names(loaded$asvs))]
+    if (length(invalid_names) > 0) {
+      stop(paste("Invalid dataset name(s) specified in ds:", 
+                 paste(invalid_names, collapse = ", ")))
+    }
+  }
   merged <- list()
-  merged$asv_table <- Reduce(function(x, y)
-    merge(x, y, by = "taxonID", all = TRUE), loaded$asv_tables)
-  merged$emof_table <- Reduce(function(x, y)
+  merged$counts <- Reduce(function(x, y)
+    merge(x, y, by = "taxonID", all = TRUE), loaded$counts[ds])
+  merged$events <- Reduce(function(x, y)
+    merge(x, y, by = "parameter", all = TRUE), loaded$events[ds])
+  merged$emof <- Reduce(function(x, y)
     merge(x, y, by = "measurementType (measurementUnit)", all = TRUE), 
-    loaded$emof_table)
+    loaded$emof[ds])
   # We want 1 row/ASV, so only merge non-dataset-specific cols here
   merge_cols <- c("taxonID", "asv_sequence", "scientificName", "taxonRank",
                   "kingdom" ,"phylum", "order", "class", "family", "genus",
@@ -136,6 +180,6 @@ merge_data <- function(loaded) {
                   "identificationReferences", "identificationRemarks")
   merged$asvs <- Reduce(function(x, y) {
     merge(x[, ..merge_cols], y[, ..merge_cols], by = merge_cols, all = TRUE)
-  }, loaded$asvs)
+  }, loaded$asvs[ds])
   return(merged)
 }

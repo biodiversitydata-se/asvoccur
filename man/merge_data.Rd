@@ -4,41 +4,48 @@
 \alias{merge_data}
 \title{Merge data from different ASV occurrence datasets}
 \usage{
-merge_data(loaded);
+merge_data(loaded, ds = NULL)
 }
 \arguments{
-\item{loaded}{A list of three sublists (\code{asv_tables}, \code{asvs},
-\code{emof_tables}) from \code{load_data()} function.}
+\item{loaded}{A multidimensional list of ASV occurrence data.table
+elements loaded with \code{\link[=load_data]{load_data()}}.}
+
+\item{ds}{An optional character vector specifying the datasets
+to merge. If excluded, all datasets will be merged.}
 }
 \value{
-A list of three data.table elements (\code{asv_table}, \code{asvs},
-\code{emof_table}) containing data merged from loaded datasets.
+A list of four data.table elements (\code{counts}, \code{asvs},
+\code{events}, \code{emof}) containing data merged from loaded datasets.
 }
 \description{
-Merge ASV/EMOF tables and asvs from different datasets previously loaded with
-\code{load_data()} function.
+Merge data from different datasets previously loaded with
+\code{\link[=load_data]{load_data()}} function.
 }
 \details{
-The function takes the output from \code{load_data()} and merges rows from
-different ASV occurrence datasets into three data.table objects:
+Takes the output from \code{\link[=load_data]{load_data()}} and merges data from
+different ASV occurrence datasets into four data.table objects:
 
 \enumerate{
-  \item ASV-table: Read counts in a \code{taxonID} [row] x \code{eventID} [col] matrix.
-  \item asvs: \code{asv_sequence}, and taxonomy columns per \code{taxonID}.
-  \item EMOF-table: Contextual parameter values (\code{measurementValue}) in a
-    \code{measurementType} (\code{measurementUnit}) x \code{eventID} matrix.
+  \item \strong{counts}: Read counts in a \code{taxonID} [row] x 
+     \code{eventID} [col] matrix.
+  \item \strong{asvs}: \code{asv_sequence}, and taxonomy columns per
+    \code{taxonID}.
+  \item \strong{events}: Basic event metadata in a parameter [row] x
+    \code{eventID} [col] matrix.
+  \item \strong{emof}: Additional contextual parameter values
+    (\code{measurementValue}) in a \code{measurementType}
+    (\code{measurementUnit}) [row] x \code{eventID} [col] matrix.
 }
 
-Merged ASV/EMOF tables include the UNION of unique rows
-(i.e. ASVs or measurements) and events (i.e. sequenced samples)
-from loaded datasets. Table asvs includes non-dataset-specific data, only, 
-so that we get a single row per unique ASV. Resulting data.table:s are
-returned as elements of list.
+Merged tables include the UNION of unique rows and events (i.e. sequenced
+samples) from loaded datasets. Table asvs includes non-dataset-specific data,
+only, so that we get a single row per unique ASV. Resulting tables are
+returned as elements of a list.
 
 To access an individual table:
 \describe{
   \item{\code{loaded <- load_data(data_path = './datasets')}}{}
-  \item{\code{merged <- load_data(loaded)}}{}
-  \item{\code{View(merged$asv_table)}}{}
+  \item{\code{merged <- merge_data(loaded)}}{}
+  \item{\code{View(merged$counts)}}{}
 }
 }

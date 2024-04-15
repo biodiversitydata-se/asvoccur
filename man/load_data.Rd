@@ -2,7 +2,7 @@
 % Please edit documentation in R/download_processing.R
 \name{load_data}
 \alias{load_data}
-\title{Read and reshape downloaded ASV occurrence data}
+\title{Load downloaded ASV occurrence data}
 \usage{
 load_data(data_path = './datasets');
 }
@@ -10,35 +10,53 @@ load_data(data_path = './datasets');
 \item{data_path}{Path of directory containing dataset (*.zip) files}
 }
 \value{
-A list of three sublists (\code{asv_tables}, \code{asvs},
-\code{emof_tables}) containing data.table elements from each dataset, 
-indexed by \code{datasetID}.
+A list of four sublists (\code{counts}, \code{asvs}, \code{events},
+  \code{emof}) containing data.table elements from each dataset, indexed by
+  \code{datasetID}.
 }
 \description{
-Read and reshape Amplicon Sequence Variant (ASV) occurrence data from
-'Darwin Core (DwC)-like' archives downloaded from the Swedish ASP portal, 
+Load Amplicon Sequence Variant (ASV) occurrence data from 'Darwin
+Core (DwC)-like' archives downloaded from the Swedish ASP portal,
 \url{https://asv-portal.biodiversitydata.se/}.
 }
 \details{
-The function reads text files (\code{occurrence/asv/emof.tsv}) from compressed
-archives (\code{[datasetID].zip}), and repackages data into three 
-data.table objects per dataset:
+Reads data from one or more compressed archives. Returns a list of
+  sub lists, each of which contains data.table objects (dt:s) from each
+  included dataset:
 
-\enumerate{
-  \item ASV-table: Read counts in a \code{taxonID} [row] x \code{eventID} [col] matrix.
-  \item asvs: \code{asv_sequence}, and taxonomy columns per \code{taxonID}.
-  \item EMOF-table: Contextual parameter values (\code{measurementValue}) in a
-    \code{measurementType} (\code{measurementUnit}) x \code{eventID} matrix.
+\itemize{
+  \item \strong{counts}: List of dt:s representing read counts
+    (\code{taxonID} [row] x \code{eventID} [col] matrix) from each dataset.
+    \itemize{
+      \item \code{`first-datasetID`} (dt)
+      \item \code{`second-datasetID`} (dt)
+    }
+
+  \item \strong{asvs}: List of dt:s representing `asv_sequence` and taxonomy
+    per \code{taxonID} from each dataset.
+    \itemize{
+      \item ...
+    }
+
+ \item \strong{event}: List of dt:s representing basic event/sample metadata
+    in a parameter [row] x \code{eventID} [col] matrix from each dataset.
+    \itemize{
+      \item ...
+    }
+
+  \item \strong{emof}: List of dt:s representing additional contextual
+    parameter values (\code{measurementValue}) in a \code{measurementType}
+    [row] x \code{eventID} [col] matrix from each dataset.
+    \itemize{
+      \item ...
+    }
 }
-
-Tables from different datasets are indexed by their respective \code{datasetID},
-and organized into three lists (\code{asv_tables}, \code{asvs}, \code{emof_tables}).
-These lists are returned as elements of a parent list.
 
 To access individual dataset tables:
 \describe{
   \item{\code{loaded <- load_data(data_path = './datasets')}}{}
-  \item{\code{View(loaded$asv_tables$`some-datasetID`)}}{ # OR:}
-  \item{\code{View(loaded$asvs[[1]])}}{}
+  \item{\code{View(loaded$counts$`first-datasetID`)}}{}
+  \item{\code{# OR:}}{}
+  \item{\code{View(loaded$counts[[1]])}}{}
 }
 }

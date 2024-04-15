@@ -12,6 +12,7 @@
 #' @importFrom data.table fread
 #' @importFrom data.table setkey
 #' @importFrom data.table setnames
+#' @importFrom data.table transpose
 #' @importFrom stats setNames
 ## usethis namespace: end
 NULL

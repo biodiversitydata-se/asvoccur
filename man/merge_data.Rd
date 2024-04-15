@@ -7,12 +7,12 @@
 merge_data(loaded);
 }
 \arguments{
-\item{loaded}{A list of three sublists (\code{counts}, \code{asvs},
-\code{emof}) from \code{load_data()} function.}
+\item{loaded}{A list of four sub lists (\code{counts}, \code{asvs},
+\code{events}), \code{emof}) from \code{load_data()} function.}
 }
 \value{
-A list of three data.table elements (\code{counts}, \code{asvs},
-\code{emof}) containing data merged from loaded datasets.
+A list of four data.table elements (\code{counts}, \code{asvs},
+\code{events}, \code{emof}) containing data merged from loaded datasets.
 }
 \description{
 Merge data from different datasets previously loaded with
@@ -20,20 +20,24 @@ Merge data from different datasets previously loaded with
 }
 \details{
 Takes the output from \code{load_data()} and merges rows from
-different ASV occurrence datasets into three data.table objects:
+different ASV occurrence datasets into four data.table objects:
 
 \enumerate{
-  \item counts: Read counts in a \code{taxonID} [row] x \code{eventID} [col] matrix.
-  \item asvs: \code{asv_sequence}, and taxonomy columns per \code{taxonID}.
-  \item emof: Contextual parameter values (\code{measurementValue}) in a
-    \code{measurementType} (\code{measurementUnit}) x \code{eventID} matrix.
+  \item \strong{counts}: Read counts in a \code{taxonID} [row] x 
+     \code{eventID} [col] matrix.
+  \item \strong{asvs}: \code{asv_sequence}, and taxonomy columns per
+    \code{taxonID}.
+  \item \strong{events}: Basic event metadata in a parameter [row] x
+    \code{eventID} [col] matrix.
+  \item \strong{emof}: Additional contextual parameter values
+    (\code{measurementValue}) in a \code{measurementType}
+    (\code{measurementUnit}) [row] x \code{eventID} [col] matrix.
 }
 
-Merged counts and emof tables include the UNION of unique rows
-(i.e. ASVs or measurements) and events (i.e. sequenced samples)
-from loaded datasets. Table asvs includes non-dataset-specific data, only, 
-so that we get a single row per unique ASV. Resulting tables are
-returned as elements of list.
+Merged tables include the UNION of unique rows and events (i.e. sequenced
+samples) from loaded datasets. Table asvs includes non-dataset-specific data,
+only, so that we get a single row per unique ASV. Resulting tables are
+returned as elements of a list.
 
 To access an individual table:
 \describe{

@@ -10,8 +10,8 @@ load_data(data_path = './datasets');
 \item{data_path}{Path of directory containing dataset (*.zip) files}
 }
 \value{
-A list of three sublists (\code{counts}, \code{asvs}, \code{emof})
-  containing data.table elements from each dataset, indexed by
+A list of four sublists (\code{counts}, \code{asvs}, \code{events},
+  \code{emof}) containing data.table elements from each dataset, indexed by
   \code{datasetID}.
 }
 \description{
@@ -38,9 +38,15 @@ Reads data from one or more compressed archives. Returns a list of
       \item ...
     }
 
-  \item \strong{emof}: List of dt:s representing contextual parameter values
-    (\code{measurementValue}) in a \code{measurementType}
-    x \code{eventID} matrix from each dataset.
+ \item \strong{event}: List of dt:s representing basic event/sample metadata
+    in a parameter [row] x \code{eventID} [col] matrix from each dataset.
+    \itemize{
+      \item ...
+    }
+
+  \item \strong{emof}: List of dt:s representing additional contextual
+    parameter values (\code{measurementValue}) in a \code{measurementType}
+    [row] x \code{eventID} [col] matrix from each dataset.
     \itemize{
       \item ...
     }

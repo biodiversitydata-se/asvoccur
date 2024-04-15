@@ -4,8 +4,8 @@
 #' Core (DwC)-like' archives downloaded from the Swedish ASP portal,
 #' \url{https://asv-portal.biodiversitydata.se/}.
 #' @param data_path Path of directory containing dataset (*.zip) files
-#' @return A list of three sublists (\code{counts}, \code{asvs}, \code{emof})
-#'   containing data.table elements from each dataset, indexed by
+#' @return A list of four sublists (\code{counts}, \code{asvs}, \code{events},
+#'   \code{emof}) containing data.table elements from each dataset, indexed by
 #'   \code{datasetID}.
 #' @usage load_data(data_path = './datasets');
 #' @details Reads data from one or more compressed archives. Returns a list of
@@ -26,9 +26,15 @@
 #'       \item ...
 #'     }
 #'
-#'   \item \strong{emof}: List of dt:s representing contextual parameter values
-#'     (\code{measurementValue}) in a \code{measurementType}
-#'     x \code{eventID} matrix from each dataset.
+#'  \item \strong{event}: List of dt:s representing basic event/sample metadata
+#'     in a parameter [row] x \code{eventID} [col] matrix from each dataset.
+#'     \itemize{
+#'       \item ...
+#'     }
+#'
+#'   \item \strong{emof}: List of dt:s representing additional contextual
+#'     parameter values (\code{measurementValue}) in a \code{measurementType}
+#'     [row] x \code{eventID} [col] matrix from each dataset.
 #'     \itemize{
 #'       \item ...
 #'     }
@@ -72,7 +78,17 @@ load_data <- function(data_path = './datasets') {
     return(asvs)
   }
   
-  # Reads & reshapes emof.tsv into wide format
+  # Reads and reshapes events.tsv
+  get_events <- function(zip) {
+    events <- fread(cmd = paste('unzip -p', zip, 'event.tsv')) # event x param
+    # Avoid data type warning when forcing parameters to share cols later
+    events[, names(events) := lapply(.SD, as.character)]
+    # Reshape into param x event
+    events <- transpose(events, make.names = "eventID", keep.names = "parameter")
+    return(events)
+  }
+  
+  # Reads & reshapes emof.tsv
   # (measurementType [measurementUnit] x eventID)
   # and drops remaining fields, e.g.measurementMethod & measurementRemarks!
   get_emof <- function(zip) {
@@ -95,6 +111,7 @@ load_data <- function(data_path = './datasets') {
   loaded <- list()
   loaded$counts <- setNames(lapply(zip_files, get_counts), dirs)
   loaded$asvs <- setNames(lapply(zip_files, get_asvs), dirs)
+  loaded$events <- setNames(lapply(zip_files, get_events), dirs)
   loaded$emof <- setNames(lapply(zip_files, get_emof), dirs)
   return(loaded)
 }
@@ -102,28 +119,32 @@ load_data <- function(data_path = './datasets') {
 #' 
 #' Merge data from different datasets previously loaded with
 #' \code{load_data()} function.
-#' @param loaded A list of three sublists (\code{counts}, \code{asvs},
-#' \code{emof}) from \code{load_data()} function.
-#' @return A list of three data.table elements (\code{counts}, \code{asvs},
-#' \code{emof}) containing data merged from loaded datasets.
+#' @param loaded A list of four sub lists (\code{counts}, \code{asvs},
+#' \code{events}), \code{emof}) from \code{load_data()} function.
+#' @return A list of four data.table elements (\code{counts}, \code{asvs},
+#' \code{events}, \code{emof}) containing data merged from loaded datasets.
 #' @usage 
 #' merge_data(loaded);
 #' @details 
 #' Takes the output from \code{load_data()} and merges rows from
-#' different ASV occurrence datasets into three data.table objects:
+#' different ASV occurrence datasets into four data.table objects:
 #' 
 #' \enumerate{
-#'   \item counts: Read counts in a \code{taxonID} [row] x \code{eventID} [col] matrix.
-#'   \item asvs: \code{asv_sequence}, and taxonomy columns per \code{taxonID}.
-#'   \item emof: Contextual parameter values (\code{measurementValue}) in a
-#'     \code{measurementType} (\code{measurementUnit}) x \code{eventID} matrix.
+#'   \item \strong{counts}: Read counts in a \code{taxonID} [row] x 
+#'      \code{eventID} [col] matrix.
+#'   \item \strong{asvs}: \code{asv_sequence}, and taxonomy columns per
+#'     \code{taxonID}.
+#'   \item \strong{events}: Basic event metadata in a parameter [row] x
+#'     \code{eventID} [col] matrix.
+#'   \item \strong{emof}: Additional contextual parameter values
+#'     (\code{measurementValue}) in a \code{measurementType}
+#'     (\code{measurementUnit}) [row] x \code{eventID} [col] matrix.
 #' }
 #' 
-#' Merged counts and emof tables include the UNION of unique rows
-#' (i.e. ASVs or measurements) and events (i.e. sequenced samples)
-#' from loaded datasets. Table asvs includes non-dataset-specific data, only, 
-#' so that we get a single row per unique ASV. Resulting tables are
-#' returned as elements of list.
+#' Merged tables include the UNION of unique rows and events (i.e. sequenced
+#' samples) from loaded datasets. Table asvs includes non-dataset-specific data,
+#' only, so that we get a single row per unique ASV. Resulting tables are
+#' returned as elements of a list.
 #' 
 #' To access an individual table:
 #' \describe{
@@ -136,6 +157,8 @@ merge_data <- function(loaded) {
   merged <- list()
   merged$counts <- Reduce(function(x, y)
     merge(x, y, by = "taxonID", all = TRUE), loaded$counts)
+  merged$events <- Reduce(function(x, y)
+    merge(x, y, by = "parameter", all = TRUE), loaded$events)
   merged$emof <- Reduce(function(x, y)
     merge(x, y, by = "measurementType (measurementUnit)", all = TRUE), 
     loaded$emof)

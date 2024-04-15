@@ -118,15 +118,16 @@ load_data <- function(data_path = './datasets') {
 #' Merge data from different ASV occurrence datasets 
 #' 
 #' Merge data from different datasets previously loaded with
-#' \code{load_data()} function.
-#' @param loaded A list of four sub lists (\code{counts}, \code{asvs},
-#' \code{events}), \code{emof}) from \code{load_data()} function.
+#' \code{\link[=load_data]{load_data()}} function.
+#' @param loaded A multidimensional list of ASV occurrence data.table
+#' elements loaded with \code{\link[=load_data]{load_data()}}.
+#' @param ds An optional character vector specifying the datasets
+#'   to merge. If excluded, all datasets will be merged.
 #' @return A list of four data.table elements (\code{counts}, \code{asvs},
 #' \code{events}, \code{emof}) containing data merged from loaded datasets.
-#' @usage 
-#' merge_data(loaded);
+#' @usage merge_data(loaded, ds = NULL)
 #' @details 
-#' Takes the output from \code{load_data()} and merges rows from
+#' Takes the output from \code{\link[=load_data]{load_data()}} and merges data from
 #' different ASV occurrence datasets into four data.table objects:
 #' 
 #' \enumerate{
@@ -153,15 +154,25 @@ load_data <- function(data_path = './datasets') {
 #'   \item{\code{View(merged$counts)}}{}
 #' }
 #' @export
-merge_data <- function(loaded) {
+merge_data <- function(loaded, ds = NULL) {
+  if (is.null(ds)) {
+    ds <- names(loaded$asvs)
+  } else if (!is.vector(ds) || 
+             length(ds) > length(intersect(ds, names(loaded$asvs)))) {
+    invalid_names <- ds[!(ds %in% names(loaded$asvs))]
+    if (length(invalid_names) > 0) {
+      stop(paste("Invalid dataset name(s) specified in ds:", 
+                 paste(invalid_names, collapse = ", ")))
+    }
+  }
   merged <- list()
   merged$counts <- Reduce(function(x, y)
-    merge(x, y, by = "taxonID", all = TRUE), loaded$counts)
+    merge(x, y, by = "taxonID", all = TRUE), loaded$counts[ds])
   merged$events <- Reduce(function(x, y)
-    merge(x, y, by = "parameter", all = TRUE), loaded$events)
+    merge(x, y, by = "parameter", all = TRUE), loaded$events[ds])
   merged$emof <- Reduce(function(x, y)
     merge(x, y, by = "measurementType (measurementUnit)", all = TRUE), 
-    loaded$emof)
+    loaded$emof[ds])
   # We want 1 row/ASV, so only merge non-dataset-specific cols here
   merge_cols <- c("taxonID", "asv_sequence", "scientificName", "taxonRank",
                   "kingdom" ,"phylum", "order", "class", "family", "genus",
@@ -169,6 +180,6 @@ merge_data <- function(loaded) {
                   "identificationReferences", "identificationRemarks")
   merged$asvs <- Reduce(function(x, y) {
     merge(x[, ..merge_cols], y[, ..merge_cols], by = merge_cols, all = TRUE)
-  }, loaded$asvs)
+  }, loaded$asvs[ds])
   return(merged)
 }

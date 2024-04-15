@@ -4,11 +4,14 @@
 \alias{merge_data}
 \title{Merge data from different ASV occurrence datasets}
 \usage{
-merge_data(loaded);
+merge_data(loaded, ds = NULL)
 }
 \arguments{
-\item{loaded}{A list of four sub lists (\code{counts}, \code{asvs},
-\code{events}), \code{emof}) from \code{load_data()} function.}
+\item{loaded}{A multidimensional list of ASV occurrence data.table
+elements loaded with \code{\link[=load_data]{load_data()}}.}
+
+\item{ds}{An optional character vector specifying the datasets
+to merge. If excluded, all datasets will be merged.}
 }
 \value{
 A list of four data.table elements (\code{counts}, \code{asvs},
@@ -16,10 +19,10 @@ A list of four data.table elements (\code{counts}, \code{asvs},
 }
 \description{
 Merge data from different datasets previously loaded with
-\code{load_data()} function.
+\code{\link[=load_data]{load_data()}} function.
 }
 \details{
-Takes the output from \code{load_data()} and merges rows from
+Takes the output from \code{\link[=load_data]{load_data()}} and merges data from
 different ASV occurrence datasets into four data.table objects:
 
 \enumerate{

@@ -55,9 +55,9 @@ load_data <- function(data_path = './datasets') {
   dirs <- gsub(".zip", "", basename(zip_files))
   
   # Reads & reshapes occurrence.tsv into wide (taxonID x eventID) format
-  build_counts <- function(zip) {
-    occurrence <- fread(cmd = paste('unzip -p', zip, 'occurrence.tsv'))
-    counts <- dcast(occurrence, taxonID ~ eventID,
+  get_counts <- function(zip) {
+    occurrences <- fread(cmd = paste('unzip -p', zip, 'occurrence.tsv'))
+    counts <- dcast(occurrences, taxonID ~ eventID,
                        value.var = "organismQuantity", fill = 0)
     setkey(counts, taxonID)
     # Set counts to integer
@@ -67,15 +67,15 @@ load_data <- function(data_path = './datasets') {
   
   # Reads ASV sequence and taxonomy from asv.tsv
   get_asvs <- function(zip) {
-    asv <- fread(cmd = paste('unzip -p', zip, 'asv.tsv'))
-    setkey(asv, taxonID)
-    return(asv)
+    asvs <- fread(cmd = paste('unzip -p', zip, 'asv.tsv'))
+    setkey(asvs, taxonID)
+    return(asvs)
   }
   
   # Reads & reshapes emof.tsv into wide format
   # (measurementType [measurementUnit] x eventID)
   # and drops remaining fields, e.g.measurementMethod & measurementRemarks!
-  build_emof <- function(zip) {
+  get_emof <- function(zip) {
     emof <- fread(cmd = paste('unzip -p', zip, 'emof.tsv'))
     # Handle datasets that have no contextual data
     if (nrow(emof) == 0) {
@@ -93,9 +93,9 @@ load_data <- function(data_path = './datasets') {
   
   # Process data into data.table:s in (sub)lists, and return in parent list
   loaded <- list()
-  loaded$counts <- setNames(lapply(zip_files, build_counts), dirs)
+  loaded$counts <- setNames(lapply(zip_files, get_counts), dirs)
   loaded$asvs <- setNames(lapply(zip_files, get_asvs), dirs)
-  loaded$emof <- setNames(lapply(zip_files, build_emof), dirs)
+  loaded$emof <- setNames(lapply(zip_files, get_emof), dirs)
   return(loaded)
 }
 #' Merge data from different ASV occurrence datasets 

@@ -27,14 +27,14 @@
 #'     }
 #'
 #'  \item \strong{event}: List of dt:s representing basic event/sample metadata
-#'     in a parameter [row] x \code{eventID} [col] matrix from each dataset.
+#'     in a \code{eventID} [col] x parameter [row] matrix from each dataset.
 #'     \itemize{
 #'       \item ...
 #'     }
 #'
 #'   \item \strong{emof}: List of dt:s representing additional contextual
-#'     parameter values (\code{measurementValue}) in a \code{measurementType}
-#'     [row] x \code{eventID} [col] matrix from each dataset.
+#'     parameter values (\code{measurementValue}) in a \code{eventID} [row]
+#'     x \code{measurementType} [col] matrix from each dataset.
 #'     \itemize{
 #'       \item ...
 #'     }
@@ -80,16 +80,15 @@ load_data <- function(data_path = './datasets') {
   
   # Reads and reshapes events.tsv
   get_events <- function(zip) {
-    events <- fread(cmd = paste('unzip -p', zip, 'event.tsv')) # event x param
-    # Avoid data type warning when forcing parameters to share cols later
-    events[, names(events) := lapply(.SD, as.character)]
-    # Reshape into param x event
-    events <- transpose(events, make.names = "eventID", keep.names = "parameter")
+    events <- fread(cmd = paste('unzip -p', zip, 'event.tsv')) # param x event
+    events[, dataset_pid := NULL] # Col for admin use only
+    setcolorder(events, c(setdiff(names(events), # Move last (& eventID first)
+                                  "ipt_resource_id"), "ipt_resource_id"))
     return(events)
   }
   
   # Reads & reshapes emof.tsv
-  # (measurementType [measurementUnit] x eventID)
+  # [eventID x measurementType (measurementUnit)]
   # and drops remaining fields, e.g.measurementMethod & measurementRemarks!
   get_emof <- function(zip) {
     emof <- fread(cmd = paste('unzip -p', zip, 'emof.tsv'))
@@ -98,12 +97,9 @@ load_data <- function(data_path = './datasets') {
       message("Adding empty emof table for ", gsub(".zip", "", zip))
       return(data.table("measurementType (measurementUnit)" = character()))
     }
-    # Convert all cols to char, to not add unwanted decimals during dcast
-    emof[, names(emof) := lapply(.SD, as.character)]
-
-    emof <- dcast(emof, paste0(measurementType, " (", measurementUnit, ")")
-                       ~ eventID, value.var = "measurementValue")
-    setnames(emof, "measurementType", "measurementType (measurementUnit)")
+    emof <- dcast(emof, 
+                  eventID ~ paste0(measurementType, " (", measurementUnit, ")"), 
+                  value.var = "measurementValue")
     return(emof)
   }
   
@@ -135,11 +131,11 @@ load_data <- function(data_path = './datasets') {
 #'      \code{eventID} [col] matrix.
 #'   \item \strong{asvs}: \code{asv_sequence}, and taxonomy columns per
 #'     \code{taxonID}.
-#'   \item \strong{events}: Basic event metadata in a parameter [row] x
-#'     \code{eventID} [col] matrix.
+#'   \item \strong{events}: Basic event metadata in a \code{eventID} [row] x
+#'     parameter [col] matrix.
 #'   \item \strong{emof}: Additional contextual parameter values
-#'     (\code{measurementValue}) in a \code{measurementType}
-#'     (\code{measurementUnit}) [row] x \code{eventID} [col] matrix.
+#'     (\code{measurementValue}) in a \code{eventID} [row]
+#'     x \code{measurementType} [col] matrix.
 #' }
 #' 
 #' Merged tables include the UNION of unique rows and events (i.e. sequenced
@@ -165,14 +161,32 @@ merge_data <- function(loaded, ds = NULL) {
                  paste(invalid_names, collapse = ", ")))
     }
   }
+  
   merged <- list()
+  
   merged$counts <- Reduce(function(x, y)
     merge(x, y, by = "taxonID", all = TRUE), loaded$counts[ds])
-  merged$events <- Reduce(function(x, y)
-    merge(x, y, by = "parameter", all = TRUE), loaded$events[ds])
-  merged$emof <- Reduce(function(x, y)
-    merge(x, y, by = "measurementType (measurementUnit)", all = TRUE), 
-    loaded$emof[ds])
+  
+  # Checks for overlaps in eventID between datasets to be merged
+  detect_event_duplicates <- function(x, y) {
+    duplicates <- intersect(x$eventID, y$eventID)
+    if (length(duplicates) > 0) { 
+      msg <- paste("Duplicated eventID(s) found in datasets to be merged:\n",
+                   paste(duplicates, collapse = ", "), "\n",
+                   "Did you accidentally try to merge multiple copies of",  
+                   "the same dataset? Please resolve before proceeding.")
+      stop(msg)
+    }
+  }
+  
+  merged$events <- Reduce(function(x, y){
+    check_event_duplicates(x, y)
+    rbindlist(list(x, y), use.names = TRUE, fill = TRUE)}, loaded$events[ds])
+  
+  merged$emof <- Reduce(function(x, y){
+    check_event_duplicates(x, y)
+    rbindlist(list(x, y), use.names = TRUE, fill = TRUE)}, loaded$emof[ds])
+  
   # We want 1 row/ASV, so only merge non-dataset-specific cols here
   merge_cols <- c("taxonID", "asv_sequence", "scientificName", "taxonRank",
                   "kingdom" ,"phylum", "order", "class", "family", "genus",
@@ -181,5 +195,6 @@ merge_data <- function(loaded, ds = NULL) {
   merged$asvs <- Reduce(function(x, y) {
     merge(x[, ..merge_cols], y[, ..merge_cols], by = merge_cols, all = TRUE)
   }, loaded$asvs[ds])
+  
   return(merged)
 }

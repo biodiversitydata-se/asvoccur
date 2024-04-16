@@ -39,14 +39,14 @@ Reads data from one or more compressed archives. Returns a list of
     }
 
  \item \strong{event}: List of dt:s representing basic event/sample metadata
-    in a parameter [row] x \code{eventID} [col] matrix from each dataset.
+    in a \code{eventID} [col] x parameter [row] matrix from each dataset.
     \itemize{
       \item ...
     }
 
   \item \strong{emof}: List of dt:s representing additional contextual
-    parameter values (\code{measurementValue}) in a \code{measurementType}
-    [row] x \code{eventID} [col] matrix from each dataset.
+    parameter values (\code{measurementValue}) in a \code{eventID} [row]
+    x \code{measurementType} [col] matrix from each dataset.
     \itemize{
       \item ...
     }

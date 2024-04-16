@@ -30,11 +30,11 @@ different ASV occurrence datasets into four data.table objects:
      \code{eventID} [col] matrix.
   \item \strong{asvs}: \code{asv_sequence}, and taxonomy columns per
     \code{taxonID}.
-  \item \strong{events}: Basic event metadata in a parameter [row] x
-    \code{eventID} [col] matrix.
+  \item \strong{events}: Basic event metadata in a \code{eventID} [row] x
+    parameter [col] matrix.
   \item \strong{emof}: Additional contextual parameter values
-    (\code{measurementValue}) in a \code{measurementType}
-    (\code{measurementUnit}) [row] x \code{eventID} [col] matrix.
+    (\code{measurementValue}) in a \code{eventID} [row]
+    x \code{measurementType} [col] matrix.
 }
 
 Merged tables include the UNION of unique rows and events (i.e. sequenced

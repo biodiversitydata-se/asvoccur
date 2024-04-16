@@ -11,8 +11,9 @@
 #' @importFrom data.table dcast
 #' @importFrom data.table fread
 #' @importFrom data.table setkey
+#' @importFrom data.table rbindlist
+#' @importFrom data.table setcolorder
 #' @importFrom data.table setnames
-#' @importFrom data.table transpose
 #' @importFrom stats setNames
 ## usethis namespace: end
 NULL
@@ -22,5 +23,5 @@ NULL
 # See 'non-standard evaluation (NSE)' & e.g.
 # https://www.r-bloggers.com/no-visible-binding-for-global-variable/
 .onLoad <- function(libname, pkgname){
-  utils::globalVariables(c("..merge_cols", "taxonID"))  
+  utils::globalVariables(c("..merge_cols", "taxonID", "dataset_pid"))  
 }

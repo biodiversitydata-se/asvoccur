@@ -207,9 +207,29 @@ merge_data <- function(loaded, ds = NULL) {
                   "kingdom" ,"phylum", "order", "class", "family", "genus",
                   "specificEpithet", "infraspecificEpithet", "otu",
                   "identificationReferences", "identificationRemarks")
-  merged$asvs <- Reduce(function(x, y) {
-    merge(x[, ..merge_cols], y[, ..merge_cols], by = merge_cols, all = TRUE)
-  }, loaded$asvs[ds])
+  merged$asvs <- Reduce(function(x, y)
+    merge(x[, ..merge_cols], y[, ..merge_cols], by = merge_cols, all = TRUE), 
+    loaded$asvs[ds])
+  
+  # Identifies duplicated ASVs with inconsistent taxonomy across datasets,
+  # likely due to merging datasets downloaded at different times
+  # (pre- and post-reannotation).
+  get_inconsistent_asvs <- function(merged_asvs, loaded_lst) {
+    ids <- merged_asvs$taxonID[duplicated(merged_asvs$taxonID)]
+    iasv_lst <- lapply(loaded_lst, function(dt) {
+      dt[dt$taxonID %in% ids, c("taxonID", "scientificName"), drop = FALSE]
+    })
+    merged_iasvs <- rbindlist(iasv_lst, idcol = "datasetID")
+    if (nrow(merged_iasvs) > 0) {
+      msg <- paste("Inconsistent ASV taxonomy detected. This can occur when",
+                   "merging datasets downloaded at different times, i.e.",
+                   "pre- and post-reannotation. Check 'View(merged$iasvs)' for",
+                   "details, and resolve before proceeding with analysis.\n")
+      warning(msg)
+    }
+    return(merged_iasvs)
+  }
+  merged$iasvs <- get_inconsistent_asvs(merged$asvs, loaded$asvs)
   
   return(merged)
 }

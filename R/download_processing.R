@@ -178,14 +178,29 @@ merge_data <- function(loaded, ds = NULL) {
       stop(msg)
     }
   }
+  # Reapplies numeric data type to cols (after merging as char)
+  restore_numeric <- function(dt){
+    dt[, names(dt) := lapply(.SD, function(col) {
+      num_value <- suppressWarnings(as.numeric(col))
+      ifelse(is.na(num_value), col, num_value)
+    })]
+  }
   
-  merged$events <- Reduce(function(x, y){
-    check_event_duplicates(x, y)
-    rbindlist(list(x, y), use.names = TRUE, fill = TRUE)}, loaded$events[ds])
+  merged$events <- restore_numeric(Reduce(function(x, y){
+    detect_event_duplicates(x, y)
+    # Convert all cols to char to ensure compatibility during merge
+    x <- x[, lapply(.SD, as.character)]
+    y <- y[, lapply(.SD, as.character)]
+    rbindlist(list(x, y), use.names = TRUE, fill = TRUE)
+    }, loaded$events[ds]))
   
-  merged$emof <- Reduce(function(x, y){
-    check_event_duplicates(x, y)
-    rbindlist(list(x, y), use.names = TRUE, fill = TRUE)}, loaded$emof[ds])
+  merged$emof <- restore_numeric(Reduce(function(x, y){
+    detect_event_duplicates(x, y)
+    # See events
+    x <- x[, lapply(.SD, as.character)]
+    y <- y[, lapply(.SD, as.character)]
+    rbindlist(list(x, y), use.names = TRUE, fill = TRUE)
+    }, loaded$emof[ds]))
   
   # We want 1 row/ASV, so only merge non-dataset-specific cols here
   merge_cols <- c("taxonID", "asv_sequence", "scientificName", "taxonRank",

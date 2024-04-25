@@ -58,7 +58,12 @@ load_data <- function(data_path = './datasets') {
   if (length(zip_files) == 0) {
     stop(paste("No ZIP files found in", data_path, "."))
   }
-  dirs <- gsub(".zip", "", basename(zip_files))
+  ds_ids <- gsub(".zip", "", basename(zip_files))
+  # Detect e.g. '<datasetID> copy.zip' or '<datasetID> (1).zip'
+  for (id in ds_ids)
+    if (!grepl("^[A-Za-z0-9_\\-]+$", id))
+      stop(paste("Invalid filename detected:", paste0("'",id,".zip'\n"),
+                 "Please resolve before proceeding."))
   
   # Reads & reshapes occurrence.tsv into wide (taxonID x eventID) format
   get_counts <- function(zip) {
@@ -105,10 +110,10 @@ load_data <- function(data_path = './datasets') {
   
   # Process data into data.table:s in (sub)lists, and return in parent list
   loaded <- list()
-  loaded$counts <- setNames(lapply(zip_files, get_counts), dirs)
-  loaded$asvs <- setNames(lapply(zip_files, get_asvs), dirs)
-  loaded$events <- setNames(lapply(zip_files, get_events), dirs)
-  loaded$emof <- setNames(lapply(zip_files, get_emof), dirs)
+  loaded$counts <- setNames(lapply(zip_files, get_counts), ds_ids)
+  loaded$asvs <- setNames(lapply(zip_files, get_asvs), ds_ids)
+  loaded$events <- setNames(lapply(zip_files, get_events), ds_ids)
+  loaded$emof <- setNames(lapply(zip_files, get_emof), ds_ids)
   return(loaded)
 }
 #' Merge data from different ASV occurrence datasets 

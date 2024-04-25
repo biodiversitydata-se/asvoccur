@@ -23,5 +23,5 @@ NULL
 # See 'non-standard evaluation (NSE)' & e.g.
 # https://www.r-bloggers.com/no-visible-binding-for-global-variable/
 .onLoad <- function(libname, pkgname){
-  utils::globalVariables(c("..merge_cols", "taxonID", "dataset_pid"))  
+  utils::globalVariables(c("..merge_cols", "taxonID", "dataset_pid", "eventID"))  
 }

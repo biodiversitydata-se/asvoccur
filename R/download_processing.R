@@ -89,6 +89,7 @@ load_data <- function(data_path = './datasets') {
     events[, dataset_pid := NULL] # Col for admin use only
     setcolorder(events, c(setdiff(names(events), # Move last (& eventID first)
                                   "ipt_resource_id"), "ipt_resource_id"))
+    setkey(events, eventID)
     return(events)
   }
   
@@ -105,6 +106,7 @@ load_data <- function(data_path = './datasets') {
     emof <- dcast(emof, 
                   eventID ~ paste0(measurementType, " (", measurementUnit, ")"), 
                   value.var = "measurementValue")
+    setkey(emof, eventID)
     return(emof)
   }
   
@@ -198,6 +200,7 @@ merge_data <- function(loaded, ds = NULL) {
     y <- y[, lapply(.SD, as.character)]
     rbindlist(list(x, y), use.names = TRUE, fill = TRUE)
     }, loaded$events[ds]))
+  setkey(merged$events, eventID)
   
   merged$emof <- restore_numeric(Reduce(function(x, y){
     detect_event_duplicates(x, y)
@@ -206,6 +209,7 @@ merge_data <- function(loaded, ds = NULL) {
     y <- y[, lapply(.SD, as.character)]
     rbindlist(list(x, y), use.names = TRUE, fill = TRUE)
     }, loaded$emof[ds]))
+  setkey(merged$emof, eventID)
   
   # We want 1 row/ASV, so only merge non-dataset-specific cols here
   merge_cols <- c("taxonID", "asv_sequence", "scientificName", "taxonRank",
@@ -215,6 +219,7 @@ merge_data <- function(loaded, ds = NULL) {
   merged$asvs <- Reduce(function(x, y)
     merge(x[, ..merge_cols], y[, ..merge_cols], by = merge_cols, all = TRUE), 
     loaded$asvs[ds])
+  setkey(merged$asvs, taxonID)
   
   # Identifies duplicated ASVs with inconsistent taxonomy across datasets,
   # likely due to merging datasets downloaded at different times

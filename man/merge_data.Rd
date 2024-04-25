@@ -14,7 +14,7 @@ elements loaded with \code{\link[=load_data]{load_data()}}.}
 to merge. If excluded, all datasets will be merged.}
 }
 \value{
-A list of four data.table elements (\code{counts}, \code{asvs},
+A list of data.table elements (\code{counts}, \code{asvs},
 \code{events}, \code{emof}) containing data merged from loaded datasets.
 }
 \description{

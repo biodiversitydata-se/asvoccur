@@ -119,7 +119,7 @@ load_data <- function(data_path = './datasets') {
 #' elements loaded with \code{\link[=load_data]{load_data()}}.
 #' @param ds An optional character vector specifying the datasets
 #'   to merge. If excluded, all datasets will be merged.
-#' @return A list of four data.table elements (\code{counts}, \code{asvs},
+#' @return A list of data.table elements (\code{counts}, \code{asvs},
 #' \code{events}, \code{emof}) containing data merged from loaded datasets.
 #' @usage merge_data(loaded, ds = NULL)
 #' @details 
@@ -216,17 +216,16 @@ merge_data <- function(loaded, ds = NULL) {
   # (pre- and post-reannotation).
   get_inconsistent_asvs <- function(merged_asvs, loaded_lst) {
     ids <- merged_asvs$taxonID[duplicated(merged_asvs$taxonID)]
+    if (length(ids) == 0) return(NULL) # If no duplicates, stop here
     iasv_lst <- lapply(loaded_lst, function(dt) {
       dt[dt$taxonID %in% ids, c("taxonID", "scientificName"), drop = FALSE]
     })
     merged_iasvs <- rbindlist(iasv_lst, idcol = "datasetID")
-    if (nrow(merged_iasvs) > 0) {
-      msg <- paste("Inconsistent ASV taxonomy detected. This can occur when",
-                   "merging datasets downloaded at different times, i.e.",
-                   "pre- and post-reannotation. Check 'View(merged$iasvs)' for",
-                   "details, and resolve before proceeding with analysis.\n")
-      warning(msg)
-    }
+    msg <- paste("Inconsistent ASV taxonomy detected. This can occur when",
+                 "merging datasets downloaded at different times, i.e.",
+                 "pre- and post-reannotation. Check 'View(merged$iasvs)' for",
+                 "details, and resolve before proceeding with analysis.\n")
+    warning(msg)
     return(merged_iasvs)
   }
   merged$iasvs <- get_inconsistent_asvs(merged$asvs, loaded$asvs)

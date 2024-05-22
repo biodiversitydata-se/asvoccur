@@ -45,7 +45,7 @@ returned as elements of a list.
 To access an individual table:
 \describe{
   \item{\code{loaded <- load_data(data_path = './datasets')}}{}
-  \item{\code{merged <- merge_data(loaded)}}{}
+  \item{\code{merged <- merge_data(loaded, ds = c(`first-datasetID`, `second-datasetID`))}}{}
   \item{\code{View(merged$counts)}}{}
 }
 }

@@ -2,8 +2,10 @@
 
 export(load_data)
 export(merge_data)
+export(sum_by_clade)
 importFrom(data.table,`.SD`)
 importFrom(data.table,`:=`)
+importFrom(data.table,copy)
 importFrom(data.table,data.table)
 importFrom(data.table,dcast)
 importFrom(data.table,fread)

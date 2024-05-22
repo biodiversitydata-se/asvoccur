@@ -242,3 +242,75 @@ merge_data <- function(loaded, ds = NULL) {
   
   return(merged)
 }
+
+#' Sum counts by clade within taxonomic ranks
+#'
+#' Sum raw and normalized ASV counts by distinct clades at different taxonomic
+#' ranks, for each sample in a \code{\link[=load_data]{loaded}} or
+#' \code{\link[=merge_data]{merged}} ASV occurrence dataset.
+#'
+#' @param counts A data.table with ASV read counts in a taxonID [row] x eventID
+#'   [col] matrix, from a \code{\link[=load_data]{loaded}} or
+#'   \code{\link[=merge_data]{merged}} ASV occurrence dataset.
+#' @param asvs A data.table containing the taxonomic classification of ASV:s
+#'   included in the \code{counts} data.table.
+#' @return A list containing two sub-lists: `raw` and `norm`, each including
+#'   data tables for summed ASV counts at each taxonomic rank.
+#' @usage sum_by_clade(counts, asvs)
+#' @details Sums raw and normalized read counts across ASVs within distinct
+#'   clades, at specified taxonomic ranks, to provide higher-level views of the
+#'   data. The function normalizes ASV read counts by total counts per sample,
+#'   and returns a list of two sub list, each of which contains data tables
+#'   (dt:s) of summed counts for each taxonomic rank:
+#'
+#' \itemize{
+#'   \item \strong{raw}: List of dt:s showing raw read counts summed by 
+#'   clade at different taxonomic ranks.
+#'     \itemize{
+#'       \item \code{kingdom} (dt)
+#'       \item ...
+#'       \item \code{species} (dt)
+#'     }
+#'   \item \strong{norm}: List of dt:s representing normalized read counts 
+#'   summed by clade at different taxonomic ranks.
+#'     \itemize{
+#'       \item \code{kingdom} (dt)
+#'       \item ...
+#'       \item \code{species} (dt)
+#'     }
+#' }
+#' @export
+sum_by_clade <- function(counts, asvs){
+  raw_counts <- counts
+  count_cols <- names(counts)[-1]  # Drop taxonID
+  norm_counts <- copy(raw_counts)
+  norm_counts[, (count_cols) := lapply(.SD, function(x) x/sum(x, na.rm = TRUE)),
+              .SDcols = count_cols]
+  
+  tax_cols <- c('taxonID', 'kingdom', 'phylum', 'order', 'class', 'family',
+                'genus', 'specificEpithet')
+  taxa <- asvs[, ..tax_cols]
+  taxa[, (tax_cols[-1]) := lapply(.SD, function(x) ifelse(x == "", NA, x)),
+       .SDcols = tax_cols[-1]]
+  taxa[, species := ifelse(is.na(specificEpithet), NA,
+                           paste(genus, specificEpithet))]
+  taxa[, specificEpithet := NULL]
+  
+  raw_tax <- merge(taxa, raw_counts, by = "taxonID")
+  norm_tax <- merge(taxa, norm_counts, by = "taxonID")
+  
+  clade_counts <- list()
+  clades <- names(taxa)[-1]
+  for (clade in clades) {
+    clade_counts$raw[[clade]] <-
+      raw_tax[, lapply(.SD, sum, na.rm = TRUE),
+              by = setNames(list(get(clade)), clade), .SDcols = count_cols]
+    clade_counts$norm[[clade]] <-
+      norm_tax[, lapply(.SD, sum, na.rm = TRUE),
+               by = setNames(list(get(clade)), clade), .SDcols = count_cols]
+  }
+  return(clade_counts)
+}
+
+
+

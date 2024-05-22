@@ -7,6 +7,7 @@
 ## usethis namespace: start
 #' @importFrom data.table `:=`
 #' @importFrom data.table `.SD`
+#' @importFrom data.table copy
 #' @importFrom data.table data.table
 #' @importFrom data.table dcast
 #' @importFrom data.table fread
@@ -23,5 +24,7 @@ NULL
 # See 'non-standard evaluation (NSE)' & e.g.
 # https://www.r-bloggers.com/no-visible-binding-for-global-variable/
 .onLoad <- function(libname, pkgname){
-  utils::globalVariables(c("..merge_cols", "taxonID", "dataset_pid", "eventID"))  
+  utils::globalVariables(c("..merge_cols", "..tax_cols",
+                           "taxonID", "dataset_pid", "eventID",
+                           "species", "specificEpithet", "genus"))  
 }

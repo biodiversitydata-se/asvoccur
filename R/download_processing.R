@@ -110,7 +110,7 @@ load_data <- function(data_path = './datasets') {
     return(emof)
   }
   
-  # Process data into data.table:s in (sub)lists, and return in parent list
+  # Process data into data tables in (sub)lists, and return in parent list
   loaded <- list()
   loaded$counts <- setNames(lapply(zip_files, get_counts), ds_ids)
   loaded$asvs <- setNames(lapply(zip_files, get_asvs), ds_ids)
@@ -153,7 +153,7 @@ load_data <- function(data_path = './datasets') {
 #' To access an individual table:
 #' \describe{
 #'   \item{\code{loaded <- load_data(data_path = './datasets')}}{}
-#'   \item{\code{merged <- merge_data(loaded)}}{}
+#'   \item{\code{merged <- merge_data(loaded, ds = c(`first-datasetID`, `second-datasetID`))}}{}
 #'   \item{\code{View(merged$counts)}}{}
 #' }
 #' @export

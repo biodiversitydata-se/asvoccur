@@ -86,7 +86,7 @@ load_data <- function(data_path = './datasets') {
   
   # Reads and reshapes events.tsv
   get_events <- function(zip) {
-    events <- fread(cmd = paste('unzip -p', zip, 'event.tsv')) # param x event
+    events <- fread(cmd = paste('unzip -p', zip, 'event.tsv'))
     events[, dataset_pid := NULL] # Col for admin use only
     setcolorder(events, c(setdiff(names(events), # Move last (& eventID first)
                                   "ipt_resource_id"), "ipt_resource_id"))

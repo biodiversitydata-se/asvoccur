@@ -99,14 +99,18 @@ load_data <- function(data_path = './datasets') {
   # and drops remaining fields, e.g.measurementMethod & measurementRemarks!
   get_emof <- function(zip) {
     emof <- fread(cmd = paste('unzip -p', zip, 'emof.tsv'))
+    event_ids <- fread(cmd = paste('unzip -p', zip, 'event.tsv'), select = "eventID")
     # Handle datasets that have no contextual data
     if (nrow(emof) == 0) {
       message("Adding empty emof table for ", gsub(".zip", "", zip))
-      return(data.table("measurementType (measurementUnit)" = character()))
+      emof <- data.table(eventID = event_ids$eventID)
+    } else {
+      emof <- dcast(emof, 
+                    eventID ~ paste0(measurementType, " (", measurementUnit, ")"), 
+                    value.var = "measurementValue")
+      # Include events without data, if any
+      emof <- merge(event_ids, emof, by = "eventID", all.x = TRUE)
     }
-    emof <- dcast(emof, 
-                  eventID ~ paste0(measurementType, " (", measurementUnit, ")"), 
-                  value.var = "measurementValue")
     setkey(emof, eventID)
     return(emof)
   }

@@ -79,6 +79,7 @@ load_data <- function(data_path = './datasets') {
   # Reads ASV sequence and taxonomy from asv.tsv
   get_asvs <- function(zip) {
     asvs <- fread(cmd = paste('unzip -p', zip, 'asv.tsv'))
+    asvs[, dataset_pid := NULL] # Col for admin use only
     setkey(asvs, taxonID)
     return(asvs)
   }

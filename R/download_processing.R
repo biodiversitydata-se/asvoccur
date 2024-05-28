@@ -300,17 +300,17 @@ sum_by_clade <- function(counts, asvs){
   raw_tax <- merge(taxa, raw_counts, by = "taxonID")
   norm_tax <- merge(taxa, norm_counts, by = "taxonID")
   
-  clade_counts <- list()
+  clade_sums <- list()
   clades <- names(taxa)[-1]
   for (clade in clades) {
-    clade_counts$raw[[clade]] <-
+    clade_sums$raw[[clade]] <-
       raw_tax[, lapply(.SD, sum, na.rm = TRUE),
               by = setNames(list(get(clade)), clade), .SDcols = count_cols]
-    clade_counts$norm[[clade]] <-
+    clade_sums$norm[[clade]] <-
       norm_tax[, lapply(.SD, sum, na.rm = TRUE),
                by = setNames(list(get(clade)), clade), .SDcols = count_cols]
   }
-  return(clade_counts)
+  return(clade_sums)
 }
 
 

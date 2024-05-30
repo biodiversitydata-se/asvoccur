@@ -80,6 +80,11 @@ load_data <- function(data_path = './datasets') {
   get_asvs <- function(zip) {
     asvs <- fread(cmd = paste('unzip -p', zip, 'asv.tsv'))
     asvs[, dataset_pid := NULL] # Col for admin use only
+    # Replace "" with NA in taxonomy
+    tax_cols <- c("kingdom", "phylum", "order", "class", "family", "genus",
+                  "specificEpithet", "infraspecificEpithet", "otu")       
+    asvs[, (tax_cols) := lapply(.SD, function(x) ifelse(x == "", NA, x)),
+         .SDcols = tax_cols]
     setkey(asvs, taxonID)
     return(asvs)
   }
@@ -295,8 +300,6 @@ sum_by_clade <- function(counts, asvs){
   tax_cols <- c('taxonID', 'kingdom', 'phylum', 'order', 'class', 'family',
                 'genus', 'specificEpithet')
   taxa <- asvs[, ..tax_cols]
-  taxa[, (tax_cols[-1]) := lapply(.SD, function(x) ifelse(x == "", NA, x)),
-       .SDcols = tax_cols[-1]]
   taxa[, species := ifelse(is.na(specificEpithet), NA,
                            paste(genus, specificEpithet))]
   taxa[, specificEpithet := NULL]

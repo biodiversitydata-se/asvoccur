@@ -289,6 +289,13 @@ merge_data <- function(loaded, ds = NULL) {
 #'       \item \code{species} (dt)
 #'     }
 #' }
+#' #' To view an individual table:
+#' \describe{
+#'   \item{\code{loaded <- load_data(data_path = './datasets')}}{}
+#'   \item{\code{merged <- merge_data(loaded)}}{}
+#'   \item{\code{summed <- sum_by_clade(merged$counts, merged$asvs)}}{}
+#'   \item{\code{View(summed$raw$family)}}{}
+#' }
 #' @export
 sum_by_clade <- function(counts, asvs){
   raw_counts <- counts
@@ -304,18 +311,18 @@ sum_by_clade <- function(counts, asvs){
                            paste(genus, specificEpithet))]
   taxa[, specificEpithet := NULL]
   
-  raw_tax <- merge(taxa, raw_counts, by = "taxonID")
-  norm_tax <- merge(taxa, norm_counts, by = "taxonID")
+  raw_counts <- merge(taxa, raw_counts, by = "taxonID")
+  norm_counts <- merge(taxa, norm_counts, by = "taxonID")
   
   clade_sums <- list()
-  clades <- names(taxa)[-1]
-  for (clade in clades) {
-    clade_sums$raw[[clade]] <-
-      raw_tax[, lapply(.SD, sum, na.rm = TRUE),
-              by = setNames(list(get(clade)), clade), .SDcols = count_cols]
-    clade_sums$norm[[clade]] <-
-      norm_tax[, lapply(.SD, sum, na.rm = TRUE),
-               by = setNames(list(get(clade)), clade), .SDcols = count_cols]
+  ranks <- names(taxa)[-1]
+  for (rank in ranks) {
+    clade_sums$raw[[rank]] <-
+      raw_counts[, lapply(.SD, sum, na.rm = TRUE),
+                 by = setNames(list(get(rank)), rank), .SDcols = count_cols]
+    clade_sums$norm[[rank]] <-
+      norm_counts[, lapply(.SD, sum, na.rm = TRUE),
+                  by = setNames(list(get(rank)), rank), .SDcols = count_cols]
   }
   return(clade_sums)
 }

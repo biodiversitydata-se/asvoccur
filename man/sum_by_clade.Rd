@@ -46,4 +46,11 @@ Sums raw and normalized read counts across ASVs within distinct
       \item \code{species} (dt)
     }
 }
+#' To view an individual table:
+\describe{
+  \item{\code{loaded <- load_data(data_path = './datasets')}}{}
+  \item{\code{merged <- merge_data(loaded)}}{}
+  \item{\code{summed <- sum_by_clade(merged$counts, merged$asvs)}}{}
+  \item{\code{View(summed$raw$family)}}{}
+}
 }

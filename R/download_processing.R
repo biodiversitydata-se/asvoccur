@@ -128,6 +128,42 @@ load_data <- function(data_path = './datasets') {
   loaded$emof <- setNames(lapply(zip_files, get_emof), ds_ids)
   return(loaded)
 }
+
+# Internal function to check that input to downstream functions is 
+# data table-based and matches the level of complexity accepted by the function.
+confirm_dt_input <- function(input, lowest_level) {
+  
+  # Determine actual input type
+  is_dt <- function(x) {  # E.g. 'merged$asvs'
+    return(inherits(x, "data.table"))
+  }
+  is_lst <- function(x) {  # E.g. 'loaded$asvs', or 'merged'
+    return(is.list(x) && all(sapply(x, is_dt)))
+  }
+  is_plst <- function(x) {  # E.g. 'loaded'
+    return(is.list(x) && all(sapply(x, function(y) is_lst(y))))
+  }
+  errors <- list(
+    dt = "Input must be a data table or a (possibly hierachical) list of data tables",
+    lst = "Input must be a (possibly hierachical) list of data tables",
+    plst = "Input must be a hierarchical list of data tables."
+  )
+  # Stop if input is 'lower' than allowed, as defined by: 
+  # dt < list of dt:s < parent list of sub lists of dt:s
+  if (lowest_level == "dt") {
+    if (is_dt(input) || is_lst(input) || is_plst(input)) { return(TRUE) } 
+    else { stop(errors$dt) }
+  } 
+  else if (lowest_level == "lst") {
+    if (is_lst(input) || is_plst(input)) { return(TRUE) } 
+    else { stop(errors$lst) }
+  } 
+  else if (lowest_level == "plst") {
+    if (is_plst(input)) { return(TRUE) } 
+    else { stop(errors$plst) }
+  }
+}
+
 #' Merge data from different ASV occurrence datasets 
 #' 
 #' Merge data from different datasets previously loaded with
@@ -168,6 +204,8 @@ load_data <- function(data_path = './datasets') {
 #' }
 #' @export
 merge_data <- function(loaded, ds = NULL) {
+  
+  confirm_dt_input(loaded, 'plst')
   if (is.null(ds)) {
     ds <- names(loaded$asvs)
   } else if (!is.vector(ds) || 
@@ -298,6 +336,10 @@ merge_data <- function(loaded, ds = NULL) {
 #' }
 #' @export
 sum_by_clade <- function(counts, asvs){
+  
+  confirm_dt_input(counts, 'dt')
+  confirm_dt_input(asvs, 'dt')
+  
   raw_counts <- counts
   count_cols <- names(counts)[-1]  # Drop taxonID
   norm_counts <- copy(raw_counts)

@@ -9,6 +9,7 @@
 #' @importFrom data.table `.SD`
 #' @importFrom data.table copy
 #' @importFrom data.table data.table
+#' @importFrom data.table is.data.table
 #' @importFrom data.table dcast
 #' @importFrom data.table fread
 #' @importFrom data.table setkey

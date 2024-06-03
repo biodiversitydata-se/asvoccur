@@ -369,5 +369,59 @@ sum_by_clade <- function(counts, asvs){
   return(clade_sums)
 }
 
+#' Convert data table(s) to data frame(s) with rownames
+#'
+#' Convert data table(s) into data frame(s), also transforming the first 
+#' (assumed ID) field into row names. Can be used to e.g. convert a single 
+#' \code{\link[=sum_by_clade]{summed}} data table, or all data table elements in
+#' \code{\link[=load_data]{loaded}} or \code{\link[=merge_data]{merged}} lists.
+#'
+#' @param dt_or_lst A data table or (possibly list of) list(s) of data tables
+#' where each dt has a unique ID in its first column.
+#' @return A corresponding data frame or (possibly list of) list(s) of data
+#' frames, in which the unique ID column has been transformed into row names.
+#' @usage convert_to_df(dt_or_lst)
+#' @details Converts data table(s) into data frame(s), also transforming the
+#' first (assumed ID) field into row names. If an ID is missing, when e.g.
+#' an ASV lacks a name at some taxonomic rank, it will be given row name
+#' 'Unknown'.
+#'
+#' Example usage:
+#' \describe{
+#'   \item{\code{loaded <- load_data(data_path = './datasets')}}{}
+#'   \item{\code{merged <- merge_data(loaded)}}{}
+#'   \item{\code{merged_df <- convert_to_df(merged)}}{}
+#' }
+#' @export
+convert_to_df <- function(dt_or_lst) {
+  
+  confirm_dt_input(dt_or_lst, 'dt')
+  
+  # Converts single dt to df, and first dt col to df rownames
+  dt_to_df <- function(dt) {
+    df <- as.data.frame(dt)
+    df[[1]][is.na(df[[1]])] <- "Unknown"  # Make useable as rowname
+    rownames(df) <- df[[1]]
+    df[[1]] <- NULL
+    return(df)
+  }
+  # Single dt
+  if (is.data.table(dt_or_lst)) { return(dt_to_df(dt_or_lst)) }
+
+  df_lst <- list()
+  for (name in names(dt_or_lst)) {
+    elem <- dt_or_lst[[name]]
+    # If list element is sublist (of dt:s, e.g. loaded$counts or summed$raw)
+    if (is.data.table(elem)) {
+      converted <- dt_to_df(elem)
+      # or list element is dt (e.g. merged$counts or summed$raw$kingdom)
+    } else {
+      converted <- lapply(elem, dt_to_df)
+    }
+    df_lst[[name]] <- converted
+  }
+  return(df_lst)
+}
+
 
 

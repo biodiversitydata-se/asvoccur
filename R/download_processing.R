@@ -5,11 +5,11 @@
 #' \url{https://asv-portal.biodiversitydata.se/}.
 #' @param data_path Path of directory containing dataset (*.zip) files
 #' @return A list of four sublists (\code{counts}, \code{asvs}, \code{events},
-#'   \code{emof}) containing data.table elements from each dataset, indexed by
+#'   \code{emof}) containing data table elements from each dataset, indexed by
 #'   \code{datasetID}.
 #' @usage load_data(data_path = './datasets');
 #' @details Reads data from one or more compressed archives. Returns a list of
-#'   sub lists, each of which contains data.table objects (dt:s) from each
+#'   sub lists, each of which contains data table objects (dt:s) from each
 #'   included dataset:
 #'
 #' \itemize{
@@ -132,16 +132,16 @@ load_data <- function(data_path = './datasets') {
 #' 
 #' Merge data from different datasets previously loaded with
 #' \code{\link[=load_data]{load_data()}} function.
-#' @param loaded A multidimensional list of ASV occurrence data.table
+#' @param loaded A multidimensional list of ASV occurrence data table
 #' elements loaded with \code{\link[=load_data]{load_data()}}.
 #' @param ds An optional character vector specifying the datasets
 #'   to merge. If excluded, all datasets will be merged.
-#' @return A list of data.table elements (\code{counts}, \code{asvs},
+#' @return A list of data table elements (\code{counts}, \code{asvs},
 #' \code{events}, \code{emof}) containing data merged from loaded datasets.
 #' @usage merge_data(loaded, ds = NULL)
 #' @details 
 #' Takes the output from \code{\link[=load_data]{load_data()}} and merges data from
-#' different ASV occurrence datasets into four data.table objects:
+#' different ASV occurrence datasets into four data table objects:
 #' 
 #' \enumerate{
 #'   \item \strong{counts}: Read counts in a \code{taxonID} [row] x 
@@ -259,11 +259,11 @@ merge_data <- function(loaded, ds = NULL) {
 #' ranks, for each sample in a \code{\link[=load_data]{loaded}} or
 #' \code{\link[=merge_data]{merged}} ASV occurrence dataset.
 #'
-#' @param counts A data.table with ASV read counts in a taxonID [row] x eventID
+#' @param counts A data table with ASV read counts in a taxonID [row] x eventID
 #'   [col] matrix, from a \code{\link[=load_data]{loaded}} or
 #'   \code{\link[=merge_data]{merged}} ASV occurrence dataset.
-#' @param asvs A data.table containing the taxonomic classification of ASV:s
-#'   included in the \code{counts} data.table.
+#' @param asvs A data table containing the taxonomic classification of ASV:s
+#'   included in the \code{counts} data table.
 #' @return A list containing two sub-lists: `raw` and `norm`, each including
 #'   data tables for summed ASV counts at each taxonomic rank.
 #' @usage sum_by_clade(counts, asvs)

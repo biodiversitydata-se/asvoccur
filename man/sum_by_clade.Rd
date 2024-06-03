@@ -7,12 +7,12 @@
 sum_by_clade(counts, asvs)
 }
 \arguments{
-\item{counts}{A data.table with ASV read counts in a taxonID [row] x eventID
+\item{counts}{A data table with ASV read counts in a taxonID [row] x eventID
 [col] matrix, from a \code{\link[=load_data]{loaded}} or
 \code{\link[=merge_data]{merged}} ASV occurrence dataset.}
 
-\item{asvs}{A data.table containing the taxonomic classification of ASV:s
-included in the \code{counts} data.table.}
+\item{asvs}{A data table containing the taxonomic classification of ASV:s
+included in the \code{counts} data table.}
 }
 \value{
 A list containing two sub-lists: `raw` and `norm`, each including

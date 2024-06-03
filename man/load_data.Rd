@@ -11,7 +11,7 @@ load_data(data_path = './datasets');
 }
 \value{
 A list of four sublists (\code{counts}, \code{asvs}, \code{events},
-  \code{emof}) containing data.table elements from each dataset, indexed by
+  \code{emof}) containing data table elements from each dataset, indexed by
   \code{datasetID}.
 }
 \description{
@@ -21,7 +21,7 @@ Core (DwC)-like' archives downloaded from the Swedish ASP portal,
 }
 \details{
 Reads data from one or more compressed archives. Returns a list of
-  sub lists, each of which contains data.table objects (dt:s) from each
+  sub lists, each of which contains data table objects (dt:s) from each
   included dataset:
 
 \itemize{

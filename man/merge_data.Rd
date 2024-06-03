@@ -7,14 +7,14 @@
 merge_data(loaded, ds = NULL)
 }
 \arguments{
-\item{loaded}{A multidimensional list of ASV occurrence data.table
+\item{loaded}{A multidimensional list of ASV occurrence data table
 elements loaded with \code{\link[=load_data]{load_data()}}.}
 
 \item{ds}{An optional character vector specifying the datasets
 to merge. If excluded, all datasets will be merged.}
 }
 \value{
-A list of data.table elements (\code{counts}, \code{asvs},
+A list of data table elements (\code{counts}, \code{asvs},
 \code{events}, \code{emof}) containing data merged from loaded datasets.
 }
 \description{
@@ -23,7 +23,7 @@ Merge data from different datasets previously loaded with
 }
 \details{
 Takes the output from \code{\link[=load_data]{load_data()}} and merges data from
-different ASV occurrence datasets into four data.table objects:
+different ASV occurrence datasets into four data table objects:
 
 \enumerate{
   \item \strong{counts}: Read counts in a \code{taxonID} [row] x 

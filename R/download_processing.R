@@ -206,14 +206,17 @@ confirm_dt_input <- function(input, lowest_level) {
 merge_data <- function(loaded, ds = NULL) {
   
   confirm_dt_input(loaded, 'plst')
+  
+  # Check that specified data sets, if any, have actually been loaded
   if (is.null(ds)) {
     ds <- names(loaded$asvs)
   } else if (!is.vector(ds) || 
              length(ds) > length(intersect(ds, names(loaded$asvs)))) {
     invalid_names <- ds[!(ds %in% names(loaded$asvs))]
     if (length(invalid_names) > 0) {
-      stop(paste("Invalid dataset name(s) specified in ds:", 
-                 paste(invalid_names, collapse = ", ")))
+      stop(paste("Invalid dataset ID(s) specified in ds:", 
+                 paste(invalid_names, collapse = ", "),
+                 " Don't include '.zip' in ID:s."))
     }
   }
   

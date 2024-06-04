@@ -350,12 +350,12 @@ sum_by_clade <- function(counts, asvs){
               .SDcols = count_cols]
   
   tax_cols <- c('taxonID', 'kingdom', 'phylum', 'order', 'class', 'family',
-                'genus', 'specificEpithet')
+                'genus', 'specificEpithet', 'otu')
   taxa <- asvs[, ..tax_cols]
   taxa[, species := ifelse(is.na(specificEpithet), NA,
                            paste(genus, specificEpithet))]
   taxa[, specificEpithet := NULL]
-  
+  setcolorder(taxa, c(setdiff(names(taxa), 'otu'), 'otu'))  # Move otu last
   raw_counts <- merge(taxa, raw_counts, by = "taxonID")
   norm_counts <- merge(taxa, norm_counts, by = "taxonID")
   

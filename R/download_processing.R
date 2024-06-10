@@ -92,11 +92,22 @@ load_data <- function(data_path = './datasets') {
   # Reads and reshapes events.tsv
   get_events <- function(zip) {
     events <- fread(cmd = paste('unzip -p', zip, 'event.tsv'))
-    events[, dataset_pid := NULL] # Col for admin use only
+    events[, c("dataset_pid", "datasetName", "ipt_resource_id") := NULL]
     setcolorder(events, c(setdiff(names(events), # Move last (& eventID first)
                                   "ipt_resource_id"), "ipt_resource_id"))
     setkey(events, eventID)
     return(events)
+  }
+  
+  get_datasets <- function(zip) {
+    ds_cols <- c("eventID", "datasetName")
+    datasets <- fread(cmd = paste('unzip -p', zip, 'event.tsv'), 
+                      select = ds_cols)
+    datasets[, datasetID := strsplit(eventID, ":")[[1]][1]]
+    datasets[, eventID := NULL]
+    setcolorder(datasets, c("datasetID", "datasetName"))
+    datasets <- unique(datasets)
+    return(datasets)
   }
   
   # Reads & reshapes emof.tsv
@@ -125,6 +136,7 @@ load_data <- function(data_path = './datasets') {
   loaded$counts <- setNames(lapply(zip_files, get_counts), ds_ids)
   loaded$asvs <- setNames(lapply(zip_files, get_asvs), ds_ids)
   loaded$events <- setNames(lapply(zip_files, get_events), ds_ids)
+  loaded$datasets <- setNames(lapply(zip_files, get_datasets), ds_ids)
   loaded$emof <- setNames(lapply(zip_files, get_emof), ds_ids)
   return(loaded)
 }
@@ -250,6 +262,11 @@ merge_data <- function(loaded, ds = NULL) {
     rbindlist(list(x, y), use.names = TRUE, fill = TRUE)
     }, loaded$events[ds]))
   setkey(merged$events, eventID)
+  
+  merged$datasets <- restore_numeric(Reduce(function(x, y){
+    rbindlist(list(x, y), use.names = TRUE, fill = TRUE)
+  }, loaded$datasets[ds]))
+  setkey(merged$datasets, datasetID)
   
   merged$emof <- restore_numeric(Reduce(function(x, y){
     detect_event_duplicates(x, y)

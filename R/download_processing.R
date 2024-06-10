@@ -140,7 +140,7 @@ confirm_dt_input <- function(input, lowest_level) {
   is_lst <- function(x) {  # E.g. 'loaded$asvs', or 'merged'
     return(is.list(x) && all(sapply(x, is_dt)))
   }
-  is_plst <- function(x) {  # E.g. 'loaded'
+  is_plst <- function(x) {  # 'Parent list' of sub lists E.g. 'loaded'
     return(is.list(x) && all(sapply(x, function(y) is_lst(y))))
   }
   errors <- list(

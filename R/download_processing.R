@@ -129,39 +129,37 @@ load_data <- function(data_path = './datasets') {
   return(loaded)
 }
 
-# Internal function to check that input to downstream functions is 
+
+# Internal functions to check that input to downstream functions is 
 # data table-based and matches the level of complexity accepted by the function.
-confirm_dt_input <- function(input, lowest_level) {
-  
-  # Determine actual input type
-  is_dt <- function(x) {  # E.g. 'merged$asvs'
-    return(inherits(x, "data.table"))
-  }
-  is_lst <- function(x) {  # E.g. 'loaded$asvs', or 'merged'
-    return(is.list(x) && all(sapply(x, is_dt)))
-  }
-  is_plst <- function(x) {  # 'Parent list' of sub lists E.g. 'loaded'
-    return(is.list(x) && all(sapply(x, function(y) is_lst(y))))
-  }
+get_input_category <- function(input) {
+  is_dt <- function(input) {  # E.g. 'merged$asvs'
+    return(inherits(input, "data.table"))}
+  is_dt_lst <- function(input) {  # E.g. 'loaded$asvs', or 'merged'
+    return(is.list(input) && all(sapply(input, is_dt)))}
+  is_p_lst <- function(input) {  # 'Parent list' of sub lists E.g. 'loaded'
+    return(is.list(input) && all(sapply(input, function(y) is_dt_lst(y))))}
+  if (is_dt(input)) return('dt')
+  if (is_dt_lst(input)) return('dt_lst')
+  if (is_p_lst(input)) return('p_lst')
+  return(FALSE)  # Non-dt-based input
+}
+check_input_category <- function(input, lowest_cat) {
+  actual_cat <- get_input_category(input)
   errors <- list(
     dt = "Input must be a data table or a (possibly hierachical) list of data tables",
-    lst = "Input must be a (possibly hierachical) list of data tables",
-    plst = "Input must be a hierarchical list of data tables."
+    dt_lst = "Input must be a (possibly hierachical) list of data tables",
+    p_lst = "Input must be a hierarchical list of data tables."
   )
-  # Stop if input is 'lower' than allowed, as defined by: 
-  # dt < list of dt:s < parent list of sub lists of dt:s
-  if (lowest_level == "dt") {
-    if (is_dt(input) || is_lst(input) || is_plst(input)) { return(TRUE) } 
-    else { stop(errors$dt) }
-  } 
-  else if (lowest_level == "lst") {
-    if (is_lst(input) || is_plst(input)) { return(TRUE) } 
-    else { stop(errors$lst) }
-  } 
-  else if (lowest_level == "plst") {
-    if (is_plst(input)) { return(TRUE) } 
-    else { stop(errors$plst) }
-  }
+  if (lowest_cat == "dt") {
+    if (actual_cat %in% c("dt", "dt_lst", "p_lst")) {
+      return(TRUE) } else { stop(errors$dt) }}
+  if (lowest_cat == "dt_lst") {
+    if (actual_cat %in% c("dt_lst", "p_lst")) {
+      return(TRUE) } else { stop(errors$dt_lst) }}
+  if (lowest_cat == "p_lst") {
+    if (actual_cat == "p_lst") {
+      return(TRUE) } else { stop(errors$p_lst) }}
 }
 
 #' Merge data from different ASV occurrence datasets 
@@ -205,7 +203,7 @@ confirm_dt_input <- function(input, lowest_level) {
 #' @export
 merge_data <- function(loaded, ds = NULL) {
   
-  confirm_dt_input(loaded, 'plst')
+  check_input_category(loaded, 'p_lst')
   
   # Check that specified data sets, if any, have actually been loaded
   if (is.null(ds)) {
@@ -340,8 +338,8 @@ merge_data <- function(loaded, ds = NULL) {
 #' @export
 sum_by_clade <- function(counts, asvs){
   
-  confirm_dt_input(counts, 'dt')
-  confirm_dt_input(asvs, 'dt')
+  check_input_category(counts, 'dt')
+  check_input_category(asvs, 'dt')
   
   raw_counts <- counts
   count_cols <- names(counts)[-1]  # Drop taxonID
@@ -379,11 +377,11 @@ sum_by_clade <- function(counts, asvs){
 #' \code{\link[=sum_by_clade]{summed}} data table, or all data table elements in
 #' \code{\link[=load_data]{loaded}} or \code{\link[=merge_data]{merged}} lists.
 #'
-#' @param dt_or_lst A data table or (possibly list of) list(s) of data tables
+#' @param dt_obj A data table or (possibly hierarchical) list of data tables
 #' where each dt has a unique ID in its first column.
 #' @return A corresponding data frame or (possibly list of) list(s) of data
 #' frames, in which the unique ID column has been transformed into row names.
-#' @usage convert_to_df(dt_or_lst)
+#' @usage convert_to_df(dt_obj)
 #' @details Converts data table(s) into data frame(s), also transforming the
 #' first (assumed ID) field into row names. If an ID is missing, when e.g.
 #' an ASV lacks a name at some taxonomic rank, it will be given row name
@@ -396,34 +394,23 @@ sum_by_clade <- function(counts, asvs){
 #'   \item{\code{merged_df <- convert_to_df(merged)}}{}
 #' }
 #' @export
-convert_to_df <- function(dt_or_lst) {
+convert_to_df <- function(dt_obj) {
   
-  confirm_dt_input(dt_or_lst, 'dt')
+  check_input_category(dt_obj, 'dt')
   
   # Converts single dt to df, and first dt col to df rownames
   dt_to_df <- function(dt) {
     df <- as.data.frame(dt)
-    df[[1]][is.na(df[[1]])] <- "Unknown"  # Make useable as rowname
+    df[[1]][is.na(df[[1]])] <- "Unknown"  # Make usable as rowname
     rownames(df) <- df[[1]]
     df[[1]] <- NULL
     return(df)
   }
-  # Single dt
-  if (is.data.table(dt_or_lst)) { return(dt_to_df(dt_or_lst)) }
-
-  df_lst <- list()
-  for (name in names(dt_or_lst)) {
-    elem <- dt_or_lst[[name]]
-    # If list element is sublist (of dt:s, e.g. loaded$counts or summed$raw)
-    if (is.data.table(elem)) {
-      converted <- dt_to_df(elem)
-      # or list element is dt (e.g. merged$counts or summed$raw$kingdom)
-    } else {
-      converted <- lapply(elem, dt_to_df)
-    }
-    df_lst[[name]] <- converted
-  }
-  return(df_lst)
+  
+  input_cat <- get_input_category(dt_obj)
+  if (input_cat == 'dt') { return(dt_to_df(dt_obj)) }
+  else if (input_cat == 'dt_lst') { return(lapply(dt_obj, dt_to_df)) }
+  return(lapply(dt_obj, function(sub) { lapply(sub, dt_to_df) }))
 }
 
 

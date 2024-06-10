@@ -4,10 +4,10 @@
 \alias{convert_to_df}
 \title{Convert data table(s) to data frame(s) with rownames}
 \usage{
-convert_to_df(dt_or_lst)
+convert_to_df(dt_obj)
 }
 \arguments{
-\item{dt_or_lst}{A data table or (possibly list of) list(s) of data tables
+\item{dt_obj}{A data table or (possibly hierarchical) list of data tables
 where each dt has a unique ID in its first column.}
 }
 \value{

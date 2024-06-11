@@ -6,7 +6,10 @@ Tools for ASV occurrence data in SBDI
 install.packages('devtools')
 library(devtools)
 install_github("pragermh/asvoccur")
+# or:
+# install_github("pragermh/asvoccur@develop")
 library(asvoccur)
+
 ```
 ## Run
 ```R

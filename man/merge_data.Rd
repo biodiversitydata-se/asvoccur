@@ -7,14 +7,14 @@
 merge_data(loaded, ds = NULL)
 }
 \arguments{
-\item{loaded}{A multidimensional list of ASV occurrence data.table
+\item{loaded}{A multidimensional list of ASV occurrence data table
 elements loaded with \code{\link[=load_data]{load_data()}}.}
 
 \item{ds}{An optional character vector specifying the datasets
 to merge. If excluded, all datasets will be merged.}
 }
 \value{
-A list of four data.table elements (\code{counts}, \code{asvs},
+A list of data table elements (\code{counts}, \code{asvs},
 \code{events}, \code{emof}) containing data merged from loaded datasets.
 }
 \description{
@@ -23,18 +23,18 @@ Merge data from different datasets previously loaded with
 }
 \details{
 Takes the output from \code{\link[=load_data]{load_data()}} and merges data from
-different ASV occurrence datasets into four data.table objects:
+different ASV occurrence datasets into four data table objects:
 
 \enumerate{
   \item \strong{counts}: Read counts in a \code{taxonID} [row] x 
      \code{eventID} [col] matrix.
-  \item \strong{asvs}: \code{asv_sequence}, and taxonomy columns per
+  \item \strong{asvs}: \code{DNA_sequence}, and taxonomy columns per
     \code{taxonID}.
-  \item \strong{events}: Basic event metadata in a parameter [row] x
-    \code{eventID} [col] matrix.
+  \item \strong{events}: Basic event metadata in a \code{eventID} [row] x
+    parameter [col] matrix.
   \item \strong{emof}: Additional contextual parameter values
-    (\code{measurementValue}) in a \code{measurementType}
-    (\code{measurementUnit}) [row] x \code{eventID} [col] matrix.
+    (\code{measurementValue}) in a \code{eventID} [row]
+    x \code{measurementType} [col] matrix.
 }
 
 Merged tables include the UNION of unique rows and events (i.e. sequenced
@@ -45,7 +45,7 @@ returned as elements of a list.
 To access an individual table:
 \describe{
   \item{\code{loaded <- load_data(data_path = './datasets')}}{}
-  \item{\code{merged <- merge_data(loaded)}}{}
+  \item{\code{merged <- merge_data(loaded, ds = c(`first-datasetID`, `second-datasetID`))}}{}
   \item{\code{View(merged$counts)}}{}
 }
 }

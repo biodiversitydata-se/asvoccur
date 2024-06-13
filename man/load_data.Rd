@@ -11,7 +11,7 @@ load_data(data_path = './datasets');
 }
 \value{
 A list of four sublists (\code{counts}, \code{asvs}, \code{events},
-  \code{emof}) containing data.table elements from each dataset, indexed by
+  \code{emof}) containing data table elements from each dataset, indexed by
   \code{datasetID}.
 }
 \description{
@@ -21,7 +21,7 @@ Core (DwC)-like' archives downloaded from the Swedish ASP portal,
 }
 \details{
 Reads data from one or more compressed archives. Returns a list of
-  sub lists, each of which contains data.table objects (dt:s) from each
+  sub lists, each of which contains data table objects (dt:s) from each
   included dataset:
 
 \itemize{
@@ -32,21 +32,21 @@ Reads data from one or more compressed archives. Returns a list of
       \item \code{`second-datasetID`} (dt)
     }
 
-  \item \strong{asvs}: List of dt:s representing `asv_sequence` and taxonomy
+  \item \strong{asvs}: List of dt:s representing `DNA_sequence` and taxonomy
     per \code{taxonID} from each dataset.
     \itemize{
       \item ...
     }
 
  \item \strong{event}: List of dt:s representing basic event/sample metadata
-    in a parameter [row] x \code{eventID} [col] matrix from each dataset.
+    in a \code{eventID} [col] x parameter [row] matrix from each dataset.
     \itemize{
       \item ...
     }
 
   \item \strong{emof}: List of dt:s representing additional contextual
-    parameter values (\code{measurementValue}) in a \code{measurementType}
-    [row] x \code{eventID} [col] matrix from each dataset.
+    parameter values (\code{measurementValue}) in a \code{eventID} [row]
+    x \code{measurementType} [col] matrix from each dataset.
     \itemize{
       \item ...
     }

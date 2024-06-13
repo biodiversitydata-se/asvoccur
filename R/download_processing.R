@@ -93,8 +93,6 @@ load_data <- function(data_path = './datasets') {
   get_events <- function(zip) {
     events <- fread(cmd = paste('unzip -p', zip, 'event.tsv'))
     events[, c("dataset_pid", "datasetName", "ipt_resource_id") := NULL]
-    setcolorder(events, c(setdiff(names(events), # Move last (& eventID first)
-                                  "ipt_resource_id"), "ipt_resource_id"))
     setkey(events, eventID)
     return(events)
   }

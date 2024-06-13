@@ -26,6 +26,7 @@ NULL
 # https://www.r-bloggers.com/no-visible-binding-for-global-variable/
 .onLoad <- function(libname, pkgname){
   utils::globalVariables(c("..merge_cols", "..tax_cols",
-                           "taxonID", "dataset_pid", "eventID",
-                           "species", "specificEpithet", "genus"))  
+                           "datasetID", "dataset_pid", "eventID",
+                           "genus", "species", "specificEpithet",
+                           "taxonID"))
 }

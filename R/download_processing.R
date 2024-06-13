@@ -20,7 +20,7 @@
 #'       \item \code{`second-datasetID`} (dt)
 #'     }
 #'
-#'   \item \strong{asvs}: List of dt:s representing `asv_sequence` and taxonomy
+#'   \item \strong{asvs}: List of dt:s representing `DNA_sequence` and taxonomy
 #'     per \code{taxonID} from each dataset.
 #'     \itemize{
 #'       \item ...
@@ -190,7 +190,7 @@ check_input_category <- function(input, lowest_cat) {
 #' \enumerate{
 #'   \item \strong{counts}: Read counts in a \code{taxonID} [row] x 
 #'      \code{eventID} [col] matrix.
-#'   \item \strong{asvs}: \code{asv_sequence}, and taxonomy columns per
+#'   \item \strong{asvs}: \code{DNA_sequence}, and taxonomy columns per
 #'     \code{taxonID}.
 #'   \item \strong{events}: Basic event metadata in a \code{eventID} [row] x
 #'     parameter [col] matrix.
@@ -276,7 +276,7 @@ merge_data <- function(loaded, ds = NULL) {
   setkey(merged$emof, eventID)
   
   # We want 1 row/ASV, so only merge non-dataset-specific cols here
-  merge_cols <- c("taxonID", "asv_sequence", "scientificName", "taxonRank",
+  merge_cols <- c("taxonID", "DNA_sequence", "scientificName", "taxonRank",
                   "kingdom" ,"phylum", "order", "class", "family", "genus",
                   "specificEpithet", "infraspecificEpithet", "otu",
                   "identificationReferences", "identificationRemarks")

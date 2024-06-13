@@ -32,7 +32,7 @@ Reads data from one or more compressed archives. Returns a list of
       \item \code{`second-datasetID`} (dt)
     }
 
-  \item \strong{asvs}: List of dt:s representing `asv_sequence` and taxonomy
+  \item \strong{asvs}: List of dt:s representing `DNA_sequence` and taxonomy
     per \code{taxonID} from each dataset.
     \itemize{
       \item ...

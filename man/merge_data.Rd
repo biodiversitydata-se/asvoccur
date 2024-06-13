@@ -28,7 +28,7 @@ different ASV occurrence datasets into four data table objects:
 \enumerate{
   \item \strong{counts}: Read counts in a \code{taxonID} [row] x 
      \code{eventID} [col] matrix.
-  \item \strong{asvs}: \code{asv_sequence}, and taxonomy columns per
+  \item \strong{asvs}: \code{DNA_sequence}, and taxonomy columns per
     \code{taxonID}.
   \item \strong{events}: Basic event metadata in a \code{eventID} [row] x
     parameter [col] matrix.

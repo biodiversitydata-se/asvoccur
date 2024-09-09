@@ -1,13 +1,16 @@
 # asvoccur
-Tools for ASV occurrence data in SBDI
+Tools for ASV occurrence data in [SBDI](https://biodiversitydata.se/).
+
+## Overview
+The **asvoccur** R package, currently under development, processes ASV occurrence data and metadata downloaded from [the Swedish ASV portal](http://asv-portal.biodiversitydata.se/). It converts condensed DwC archives into ASV table format for easier downstream analysis in R, providing functions to load, merge, and aggregate ASV counts across taxonomic ranks.
 
 ## Install
 ```R
 install.packages('devtools')
 library(devtools)
-install_github("pragermh/asvoccur")
+install_github("biodiversitydata-se/asvoccur")
 # or:
-# install_github("pragermh/asvoccur@develop")
+# install_github("biodiversitydata-se/asvoccur@develop")
 library(asvoccur)
 
 ```

@@ -22,9 +22,9 @@ Convert data table(s) into data frame(s), also transforming the first
 }
 \details{
 Converts data table(s) into data frame(s), also transforming the
-first (assumed ID) field into row names. If an ID is missing, when e.g.
-an ASV lacks a name at some taxonomic rank, it will be given row name
-'Unknown'.
+first (assumed ID) field into row names. ASVs that lack an ID, i.e. a name
+at some taxonomic rank, will be grouped into a row named 'Unnamed-clades' at
+that level.
 
 Example usage:
 \describe{

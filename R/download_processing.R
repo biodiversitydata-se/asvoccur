@@ -398,9 +398,9 @@ sum_by_clade <- function(counts, asvs){
 #' frames, in which the unique ID column has been transformed into row names.
 #' @usage convert_to_df(dt_obj)
 #' @details Converts data table(s) into data frame(s), also transforming the
-#' first (assumed ID) field into row names. If an ID is missing, when e.g.
-#' an ASV lacks a name at some taxonomic rank, it will be given row name
-#' 'Unknown'.
+#' first (assumed ID) field into row names. ASVs that lack an ID, i.e. a name
+#' at some taxonomic rank, will be grouped into a row named 'Unnamed-clades' at
+#' that level.
 #'
 #' Example usage:
 #' \describe{
@@ -416,7 +416,7 @@ convert_to_df <- function(dt_obj) {
   # Converts single dt to df, and first dt col to df rownames
   dt_to_df <- function(dt) {
     df <- as.data.frame(dt)
-    df[[1]][is.na(df[[1]])] <- "Unknown"  # Make usable as rowname
+    df[[1]][is.na(df[[1]])] <- "Unnamed-clades"  # Make usable as rowname
     rownames(df) <- df[[1]]
     df[[1]] <- NULL
     return(df)

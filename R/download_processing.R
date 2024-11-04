@@ -81,7 +81,7 @@ load_data <- function(data_path = './datasets') {
     asvs <- fread(cmd = paste('unzip -p', zip, 'asv.tsv'))
     asvs[, dataset_pid := NULL] # Col for admin use only
     # Replace "" with NA in taxonomy
-    tax_cols <- c("kingdom", "phylum", "order", "class", "family", "genus",
+    tax_cols <- c("kingdom", "phylum", "class", "order", "family", "genus",
                   "specificEpithet", "infraspecificEpithet", "otu")       
     asvs[, (tax_cols) := lapply(.SD, function(x) ifelse(x == "", NA, x)),
          .SDcols = tax_cols]
@@ -277,7 +277,7 @@ merge_data <- function(loaded, ds = NULL) {
   
   # We want 1 row/ASV, so only merge non-dataset-specific cols here
   merge_cols <- c("taxonID", "DNA_sequence", "scientificName", "taxonRank",
-                  "kingdom" ,"phylum", "order", "class", "family", "genus",
+                  "kingdom" ,"phylum", "class", "order", "family", "genus",
                   "specificEpithet", "infraspecificEpithet", "otu",
                   "identificationReferences", "identificationRemarks")
   merged$asvs <- Reduce(function(x, y)
@@ -362,7 +362,7 @@ sum_by_clade <- function(counts, asvs){
   norm_counts[, (count_cols) := lapply(.SD, function(x) x/sum(x, na.rm = TRUE)),
               .SDcols = count_cols]
   
-  tax_cols <- c('taxonID', 'kingdom', 'phylum', 'order', 'class', 'family',
+  tax_cols <- c('taxonID', 'kingdom', 'phylum', 'class', 'order', 'family',
                 'genus', 'specificEpithet', 'otu')
   taxa <- asvs[, ..tax_cols]
   taxa[, species := ifelse(is.na(specificEpithet), NA,

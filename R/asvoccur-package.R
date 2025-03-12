@@ -15,8 +15,10 @@
 #' @importFrom data.table setkey
 #' @importFrom data.table rbindlist
 #' @importFrom data.table setcolorder
+#' @importFrom data.table setDT
 #' @importFrom data.table setnames
 #' @importFrom stats setNames
+#' @importFrom vroom vroom
 ## usethis namespace: end
 NULL
 

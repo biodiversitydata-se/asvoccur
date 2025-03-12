@@ -6,6 +6,7 @@ Author: The SBDI Molecular Data Team
 Description: This package provides functions for handling ASV occurrence data in SBDI.
 Imports:
     data.table,
+    Matrix,
     stats,
     vroom
 RoxygenNote: 7.3.2

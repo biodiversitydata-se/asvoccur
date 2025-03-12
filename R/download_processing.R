@@ -65,15 +65,21 @@ load_data <- function(data_path = './datasets') {
       stop(paste("Invalid filename detected:", paste0("'",id,".zip'\n"),
                  "Please resolve before proceeding."))
   
-  # Reads & reshapes occurrence.tsv into wide (taxonID x eventID) format
+  # Reads & reshapes occurrence.tsv into sparse (!) and wide (taxonID x eventID) format
   get_counts <- function(zip) {
-    occurrences <- setDT(vroom(unz(zip, "occurrence.tsv"), 
-                               show_col_types = FALSE))
-    counts <- dcast(occurrences, taxonID ~ eventID,
-                    value.var = "organismQuantity", fill = 0)
-    setkey(counts, taxonID)
-    # Set counts to integer
-    counts[, names(counts)[-1] := lapply(.SD, as.integer), .SDcols = -1]
+    occurrences <- setDT(vroom(unz(zip, "occurrence.tsv"), show_col_types = FALSE))
+    
+    occurrences[, taxonID := as.factor(taxonID)]
+    occurrences[, eventID := as.factor(eventID)]
+    
+    counts <- Matrix::sparseMatrix(
+      i = as.integer(occurrences$taxonID),
+      j = as.integer(occurrences$eventID),
+      x = occurrences$organismQuantity,
+      dims = c(nlevels(occurrences$taxonID), nlevels(occurrences$eventID)),
+      dimnames = list(levels(occurrences$taxonID), levels(occurrences$eventID))
+    )
+    
     return(counts)
   }
   

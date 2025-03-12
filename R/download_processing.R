@@ -67,9 +67,10 @@ load_data <- function(data_path = './datasets') {
   
   # Reads & reshapes occurrence.tsv into wide (taxonID x eventID) format
   get_counts <- function(zip) {
-    occurrences <- fread(cmd = paste('unzip -p', zip, 'occurrence.tsv'))
+    occurrences <- setDT(vroom(unz(zip, "occurrence.tsv"), 
+                               show_col_types = FALSE))
     counts <- dcast(occurrences, taxonID ~ eventID,
-                       value.var = "organismQuantity", fill = 0)
+                    value.var = "organismQuantity", fill = 0)
     setkey(counts, taxonID)
     # Set counts to integer
     counts[, names(counts)[-1] := lapply(.SD, as.integer), .SDcols = -1]
@@ -78,10 +79,15 @@ load_data <- function(data_path = './datasets') {
   
   # Reads ASV sequence and taxonomy from asv.tsv
   get_asvs <- function(zip) {
-    asvs <- fread(cmd = paste('unzip -p', zip, 'asv.tsv'))
+    asvs <- setDT(vroom(unz(zip, "asv.tsv"), 
+                        # Don't interpret as logical
+                        col_types = vroom::cols(
+                          infraspecificEpithet = vroom::col_character()),
+                        show_col_types = FALSE))
+    
     asvs[, dataset_pid := NULL] # Col for admin use only
     # Replace "" with NA in taxonomy
-    tax_cols <- c("kingdom", "phylum", "class", "order", "family", "genus",
+    tax_cols <- c("kingdom", "phylum", "order", "class", "family", "genus",
                   "specificEpithet", "infraspecificEpithet", "otu")       
     asvs[, (tax_cols) := lapply(.SD, function(x) ifelse(x == "", NA, x)),
          .SDcols = tax_cols]
@@ -91,7 +97,8 @@ load_data <- function(data_path = './datasets') {
   
   # Reads and reshapes events.tsv
   get_events <- function(zip) {
-    events <- fread(cmd = paste('unzip -p', zip, 'event.tsv'))
+    events <- setDT(vroom(unz(zip, "event.tsv"),
+                          show_col_types = FALSE))
     events[, c("dataset_pid", "datasetName", "ipt_resource_id") := NULL]
     setkey(events, eventID)
     return(events)
@@ -99,8 +106,8 @@ load_data <- function(data_path = './datasets') {
   
   get_datasets <- function(zip) {
     ds_cols <- c("eventID", "datasetName")
-    datasets <- fread(cmd = paste('unzip -p', zip, 'event.tsv'), 
-                      select = ds_cols)
+    datasets <- setDT(vroom(unz(zip, "event.tsv"), col_select = ds_cols,
+                            show_col_types = FALSE))
     datasets[, datasetID := strsplit(eventID, ":")[[1]][1]]
     datasets[, eventID := NULL]
     setcolorder(datasets, c("datasetID", "datasetName"))
@@ -113,7 +120,9 @@ load_data <- function(data_path = './datasets') {
   # and drops remaining fields, e.g.measurementMethod & measurementRemarks!
   get_emof <- function(zip) {
     emof <- fread(cmd = paste('unzip -p', zip, 'emof.tsv'))
-    event_ids <- fread(cmd = paste('unzip -p', zip, 'event.tsv'), select = "eventID")
+    event_ids <- setDT(vroom(unz(zip, "event.tsv"), col_select = "eventID",
+                             show_col_types = FALSE))
+    
     # Handle datasets that have no contextual data
     if (nrow(emof) == 0) {
       message("Adding empty emof table for ", gsub(".zip", "", zip))
@@ -258,7 +267,7 @@ merge_data <- function(loaded, ds = NULL) {
     x <- x[, lapply(.SD, as.character)]
     y <- y[, lapply(.SD, as.character)]
     rbindlist(list(x, y), use.names = TRUE, fill = TRUE)
-    }, loaded$events[ds]))
+  }, loaded$events[ds]))
   setkey(merged$events, eventID)
   
   merged$datasets <- restore_numeric(Reduce(function(x, y){
@@ -272,12 +281,12 @@ merge_data <- function(loaded, ds = NULL) {
     x <- x[, lapply(.SD, as.character)]
     y <- y[, lapply(.SD, as.character)]
     rbindlist(list(x, y), use.names = TRUE, fill = TRUE)
-    }, loaded$emof[ds]))
+  }, loaded$emof[ds]))
   setkey(merged$emof, eventID)
   
   # We want 1 row/ASV, so only merge non-dataset-specific cols here
   merge_cols <- c("taxonID", "DNA_sequence", "scientificName", "taxonRank",
-                  "kingdom" ,"phylum", "class", "order", "family", "genus",
+                  "kingdom" ,"phylum", "order", "class", "family", "genus",
                   "specificEpithet", "infraspecificEpithet", "otu",
                   "identificationReferences", "identificationRemarks")
   merged$asvs <- Reduce(function(x, y)
@@ -362,7 +371,7 @@ sum_by_clade <- function(counts, asvs){
   norm_counts[, (count_cols) := lapply(.SD, function(x) x/sum(x, na.rm = TRUE)),
               .SDcols = count_cols]
   
-  tax_cols <- c('taxonID', 'kingdom', 'phylum', 'class', 'order', 'family',
+  tax_cols <- c('taxonID', 'kingdom', 'phylum', 'order', 'class', 'family',
                 'genus', 'specificEpithet', 'otu')
   taxa <- asvs[, ..tax_cols]
   taxa[, species := ifelse(is.na(specificEpithet), NA,

@@ -155,7 +155,7 @@ load_data <- function(data_path = './datasets') {
 }
 
 
-# Internal functions to check that input to downstream functions is 
+# Internal functions to check that input to downstream functions is
 # data table-based and matches the level of complexity accepted by the function.
 get_input_category <- function(input) {
   is_dt <- function(input) {  # E.g. 'merged$asvs'
@@ -228,7 +228,7 @@ check_input_category <- function(input, lowest_cat) {
 #' @export
 merge_data <- function(loaded, ds = NULL) {
   
-  check_input_category(loaded, 'p_lst')
+  # check_input_category(loaded, 'p_lst')
   
   # Check that specified data sets, if any, have actually been loaded
   if (is.null(ds)) {
@@ -245,8 +245,22 @@ merge_data <- function(loaded, ds = NULL) {
   
   merged <- list()
   
-  merged$counts <- Reduce(function(x, y)
-    merge(x, y, by = "taxonID", all = TRUE), loaded$counts[ds])
+  # Iteratively merges sparse matrices with union of ASVs and events
+  merge_sparse_counts <- function(matrices) {
+    all_asvs <- unique(unlist(lapply(matrices, rownames)))
+    # Add missing ASVs and sort identically across matrices
+    padded_matrices <- lapply(matrices, function(mat) {
+      missing_asvs <- setdiff(all_asvs, rownames(mat))
+      if (length(missing_asvs) > 0) {
+        empty_mat <- Matrix::Matrix(0, nrow = length(missing_asvs), ncol = ncol(mat),
+                            dimnames = list(missing_asvs, colnames(mat)))
+        mat <- rbind(mat, empty_mat)
+      }
+      mat[order(rownames(mat)), , drop = FALSE]
+    })
+    Reduce(Matrix::cbind2, padded_matrices)
+  }
+  merged$counts <- merge_sparse_counts(loaded$counts[ds])
   
   # Checks for overlaps in eventID between datasets to be merged
   detect_event_duplicates <- function(x, y) {
@@ -303,21 +317,21 @@ merge_data <- function(loaded, ds = NULL) {
   # Identifies duplicated ASVs with inconsistent taxonomy across datasets,
   # likely due to merging datasets downloaded at different times
   # (pre- and post-reannotation).
-  get_inconsistent_asvs <- function(merged_asvs, loaded_lst) {
-    ids <- merged_asvs$taxonID[duplicated(merged_asvs$taxonID)]
-    if (length(ids) == 0) return(NULL) # If no duplicates, stop here
-    iasv_lst <- lapply(loaded_lst, function(dt) {
-      dt[dt$taxonID %in% ids, c("taxonID", "scientificName"), drop = FALSE]
-    })
-    merged_iasvs <- rbindlist(iasv_lst, idcol = "datasetID")
-    msg <- paste("Inconsistent ASV taxonomy detected. This can occur when",
-                 "merging datasets downloaded at different times, i.e.",
-                 "pre- and post-reannotation. Check 'View(merged$iasvs)' for",
-                 "details, and resolve before proceeding with analysis.\n")
-    warning(msg)
-    return(merged_iasvs)
-  }
-  merged$iasvs <- get_inconsistent_asvs(merged$asvs, loaded$asvs)
+  # get_inconsistent_asvs <- function(merged_asvs, loaded_lst) {
+  #   ids <- merged_asvs$taxonID[duplicated(merged_asvs$taxonID)]
+  #   if (length(ids) == 0) return(NULL) # If no duplicates, stop here
+  #   iasv_lst <- lapply(loaded_lst, function(dt) {
+  #     dt[dt$taxonID %in% ids, c("taxonID", "scientificName"), drop = FALSE]
+  #   })
+  #   merged_iasvs <- rbindlist(iasv_lst, idcol = "datasetID")
+  #   msg <- paste("Inconsistent ASV taxonomy detected. This can occur when",
+  #                "merging datasets downloaded at different times, i.e.",
+  #                "pre- and post-reannotation. Check 'View(merged$iasvs)' for",
+  #                "details, and resolve before proceeding with analysis.\n")
+  #   warning(msg)
+  #   return(merged_iasvs)
+  # }
+  # merged$iasvs <- get_inconsistent_asvs(merged$asvs, loaded$asvs)
   
   return(merged)
 }

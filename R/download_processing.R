@@ -156,29 +156,41 @@ load_data <- function(data_path = './datasets') {
 
 
 # Internal functions to check that input to downstream functions is
-# data table-based and matches the level of complexity accepted by the function.
+# data table- (or matrix-) based and matches the level of complexity accepted by the function.
 get_input_category <- function(input) {
+  
   is_dt <- function(input) {  # E.g. 'merged$asvs'
     return(inherits(input, "data.table"))}
+  is_sp_mat <- function(input) {  # E.g. 'loaded$counts'
+    return(inherits(input, "sparseMatrix"))}
+  # Check if input is a list containing data.tables or sparse matrices
   is_dt_lst <- function(input) {  # E.g. 'loaded$asvs', or 'merged'
-    return(is.list(input) && all(sapply(input, is_dt)))}
+    return(is.list(input) && all(sapply(input, function(x) is_dt(x) || is_sp_mat(x))))}
+  # Check if input is a parent list (list of lists) containing data.table or sparse matrix
   is_p_lst <- function(input) {  # 'Parent list' of sub lists E.g. 'loaded'
-    return(is.list(input) && all(sapply(input, function(y) is_dt_lst(y))))}
+    return(is.list(input) && all(sapply(input, function(y) is_dt_lst(y) || is_sp_mat(y))))}
+  
   if (is_dt(input)) return('dt')
   if (is_dt_lst(input)) return('dt_lst')
   if (is_p_lst(input)) return('p_lst')
-  return(FALSE)  # Non-dt-based input
+  if (is_sp_mat(input)) return('sp_mat')
+  return(FALSE)  # Non-dt or matrix-based input
 }
+
 check_input_category <- function(input, lowest_cat) {
   actual_cat <- get_input_category(input)
   errors <- list(
-    dt = "Input must be a data table or a (possibly hierachical) list of data tables",
-    dt_lst = "Input must be a (possibly hierachical) list of data tables",
-    p_lst = "Input must be a hierarchical list of data tables."
+    dt = "Input must be a data table or a (possibly hierachical) list of data tables and matrice",
+    sp_mat = "Input must be a sparse matrix or a (possibly hierachical) list of data tables and matrice",
+    dt_lst = "Input must be a (possibly hierachical) list of data tables and matrice",
+    p_lst = "Input must be a hierarchical list of data tables and matrice"
   )
   if (lowest_cat == "dt") {
     if (actual_cat %in% c("dt", "dt_lst", "p_lst")) {
       return(TRUE) } else { stop(errors$dt) }}
+  if (lowest_cat == "sp_mat") {
+    if (actual_cat %in% c("sp_mat", "dt_lst", "p_lst")) {
+      return(TRUE) } else { stop(errors$sp_mat) }}
   if (lowest_cat == "dt_lst") {
     if (actual_cat %in% c("dt_lst", "p_lst")) {
       return(TRUE) } else { stop(errors$dt_lst) }}
@@ -228,7 +240,7 @@ check_input_category <- function(input, lowest_cat) {
 #' @export
 merge_data <- function(loaded, ds = NULL) {
   
-  # check_input_category(loaded, 'p_lst')
+  check_input_category(loaded, 'p_lst')
   
   # Check that specified data sets, if any, have actually been loaded
   if (is.null(ds)) {

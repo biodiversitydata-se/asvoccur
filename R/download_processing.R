@@ -277,7 +277,7 @@ merge_data <- function(loaded, ds = NULL) {
     # Add missing ASVs and sort identically across matrices
     padded_matrices <- lapply(matrices, function(mat) {
       missing_asvs <- setdiff(all_asvs, rownames(mat))
-      if (length(missing_asvs) > 0) {
+      if (length(missing_asvs) > 0) {  # Set missing counts to 0
         empty_mat <- Matrix::Matrix(0, nrow = length(missing_asvs), ncol = ncol(mat),
                             dimnames = list(missing_asvs, colnames(mat)))
         mat <- rbind(mat, empty_mat)
@@ -334,7 +334,7 @@ merge_data <- function(loaded, ds = NULL) {
   
   # Identifies duplicated ASVs with inconsistent taxonomy across datasets,
   # likely due to merging datasets downloaded at different times
-  # (pre- and post-reannotation).
+  # (pre- and post-annotation update).
   get_inconsistent_asvs <- function(merged_asvs, loaded_lst) {
     ids <- merged_asvs$taxonID[duplicated(merged_asvs$taxonID)]
     if (length(ids) == 0) return(NULL) # If no duplicates, stop here

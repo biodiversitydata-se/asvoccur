@@ -255,6 +255,20 @@ merge_data <- function(loaded, ds = NULL) {
     }
   }
   
+  # Checks for overlaps in eventID between datasets to be merged
+  detect_event_duplicates <- function(x, y, is_sparse = FALSE) {
+    event_x <- if (is_sparse) colnames(x) else x$eventID
+    event_y <- if (is_sparse) colnames(y) else y$eventID
+    duplicates <- intersect(event_x, event_y)
+    if (length(duplicates) > 0) { 
+      msg <- paste("Duplicated eventID(s) found in datasets to be merged:\n",
+                   paste(duplicates, collapse = ", "), "\n",
+                   "Did you accidentally try to merge multiple copies of",  
+                   "the same dataset? Please resolve before proceeding.")
+      stop(msg)
+    }
+  }
+  
   merged <- list()
   
   # Iteratively merges sparse matrices with union of ASVs and events
@@ -270,21 +284,13 @@ merge_data <- function(loaded, ds = NULL) {
       }
       mat[order(rownames(mat)), , drop = FALSE]
     })
-    Reduce(Matrix::cbind2, padded_matrices)
+    Reduce(function(x, y) {
+      detect_event_duplicates(x, y, is_sparse = TRUE)
+      Matrix::cbind2(x, y)
+    }, padded_matrices)
   }
   merged$counts <- merge_sparse_counts(loaded$counts[ds])
   
-  # Checks for overlaps in eventID between datasets to be merged
-  detect_event_duplicates <- function(x, y) {
-    duplicates <- intersect(x$eventID, y$eventID)
-    if (length(duplicates) > 0) { 
-      msg <- paste("Duplicated eventID(s) found in datasets to be merged:\n",
-                   paste(duplicates, collapse = ", "), "\n",
-                   "Did you accidentally try to merge multiple copies of",  
-                   "the same dataset? Please resolve before proceeding.")
-      stop(msg)
-    }
-  }
   # Reapplies numeric data type to cols (after merging as char)
   restore_numeric <- function(dt){
     dt[, names(dt) := lapply(.SD, function(col) {

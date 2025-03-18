@@ -67,8 +67,8 @@ load_data <- function(data_path = './datasets') {
   
   # Reads & reshapes occurrence.tsv into sparse (!) and wide (taxonID x eventID) format
   get_counts <- function(zip) {
-    occurrences <- setDT(vroom(unz(zip, "occurrence.tsv"), show_col_types = FALSE))
-    
+    occurrences <- fread(utils::unzip(zip, files = "occurrence.tsv", 
+                                      exdir = tempdir()))
     occurrences[, taxonID := as.factor(taxonID)]
     occurrences[, eventID := as.factor(eventID)]
     
@@ -85,12 +85,7 @@ load_data <- function(data_path = './datasets') {
   
   # Reads ASV sequence and taxonomy from asv.tsv
   get_asvs <- function(zip) {
-    asvs <- setDT(vroom(unz(zip, "asv.tsv"), 
-                        # Don't interpret as logical
-                        col_types = vroom::cols(
-                          infraspecificEpithet = vroom::col_character()),
-                        show_col_types = FALSE))
-    
+    asvs <- fread(utils::unzip(zip, files = "asv.tsv", exdir = tempfile()))
     asvs[, dataset_pid := NULL] # Col for admin use only
     # Replace "" with NA in taxonomy
     tax_cols <- c("kingdom", "phylum", "order", "class", "family", "genus",
@@ -103,8 +98,7 @@ load_data <- function(data_path = './datasets') {
   
   # Reads and reshapes events.tsv
   get_events <- function(zip) {
-    events <- setDT(vroom(unz(zip, "event.tsv"),
-                          show_col_types = FALSE))
+    events <- fread(utils::unzip(zip, files = "event.tsv", exdir = tempfile()))
     events[, c("dataset_pid", "datasetName", "ipt_resource_id") := NULL]
     setkey(events, eventID)
     return(events)
@@ -112,8 +106,8 @@ load_data <- function(data_path = './datasets') {
   
   get_datasets <- function(zip) {
     ds_cols <- c("eventID", "datasetName")
-    datasets <- setDT(vroom(unz(zip, "event.tsv"), col_select = ds_cols,
-                            show_col_types = FALSE))
+    datasets <- fread(utils::unzip(zip, files = "event.tsv", 
+                                   exdir = tempfile()), select = ds_cols)
     datasets[, datasetID := strsplit(eventID, ":")[[1]][1]]
     datasets[, eventID := NULL]
     setcolorder(datasets, c("datasetID", "datasetName"))
@@ -125,10 +119,10 @@ load_data <- function(data_path = './datasets') {
   # [eventID x measurementType (measurementUnit)]
   # and drops remaining fields, e.g.measurementMethod & measurementRemarks!
   get_emof <- function(zip) {
-    emof <- fread(cmd = paste('unzip -p', zip, 'emof.tsv'))
-    event_ids <- setDT(vroom(unz(zip, "event.tsv"), col_select = "eventID",
-                             show_col_types = FALSE))
-    
+    emof <- fread(utils::unzip(zip, files = "emof.tsv", exdir = tempfile()))
+    event_ids <- fread(utils::unzip(zip, files = 'event.tsv', exdir = tempfile()), 
+                       select = "eventID")
+
     # Handle datasets that have no contextual data
     if (nrow(emof) == 0) {
       message("Adding empty emof table for ", gsub(".zip", "", zip))

@@ -7,8 +7,7 @@ Description: This package provides functions for handling ASV occurrence data in
 Imports:
     data.table,
     Matrix,
-    stats,
-    vroom
+    stats
 RoxygenNote: 7.3.2
 Encoding: UTF-8
 Maintainer: Maria Prager <maria.prager@scilifelab.se>

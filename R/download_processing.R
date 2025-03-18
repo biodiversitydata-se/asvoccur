@@ -425,23 +425,28 @@ sum_by_clade <- function(counts, asvs) {
     clade_levels <- unique(clades)
     clade_index <- match(clades, clade_levels)
     
+    # Aggregate using matrix multiplication
     G <- Matrix::sparseMatrix(i = clade_index, j = seq_along(clades), x = 1,
                               dims = c(length(clade_levels), length(clades)))
-    
-    raw_matrix <- G %*% counts  # Matrix multiplication
+    raw_matrix <- G %*% counts
     rownames(raw_matrix) <- clade_levels
+    
+    # Normalise
     norm_matrix <- raw_matrix %*% Matrix::Diagonal(x = 1 / Matrix::colSums(raw_matrix))
     colnames(norm_matrix) <- colnames(raw_matrix)
-    
+   
+     # Sort clades
     clade_order <- order(rownames(raw_matrix))
     raw_matrix <- raw_matrix[clade_order, , drop = FALSE]
     norm_matrix <- norm_matrix[clade_order, , drop = FALSE]
     
+    # Convert to dt:s
     clade_sums_raw[[rank]] <- data.table(clade = rownames(raw_matrix), as.matrix(raw_matrix))
     clade_sums_norm[[rank]] <- data.table(clade = rownames(norm_matrix), as.matrix(norm_matrix))
   }
   return(list(raw = clade_sums_raw, norm = clade_sums_norm))
 }
+
 #' Convert data table(s) to data frame(s) with rownames
 #'
 #' Convert data table(s) into data frame(s), also transforming the first 

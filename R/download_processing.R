@@ -398,40 +398,50 @@ merge_data <- function(loaded, ds = NULL) {
 #'   \item{\code{View(summed$raw$family)}}{}
 #' }
 #' @export
-sum_by_clade <- function(counts, asvs){
+sum_by_clade <- function(counts, asvs) {
   
-  check_input_category(counts, 'dt')
-  check_input_category(asvs, 'dt')
+  check_input_category(counts, 'Matrix')
+  check_input_category(asvs, 'data.table')
   
-  raw_counts <- counts
-  count_cols <- names(counts)[-1]  # Drop taxonID
-  norm_counts <- copy(raw_counts)
-  norm_counts[, (count_cols) := lapply(.SD, function(x) x/sum(x, na.rm = TRUE)),
-              .SDcols = count_cols]
+  if (!identical(rownames(counts), asvs$taxonID)) {
+    asvs <- asvs[match(rownames(counts), asvs$taxonID)]
+    message("Reordered 'taxa' to match the order of 'counts'.")
+  }
   
-  tax_cols <- c('taxonID', 'kingdom', 'phylum', 'order', 'class', 'family',
+  tax_cols <- c('taxonID', 'kingdom', 'phylum', 'class', 'order', 'family', 
                 'genus', 'specificEpithet', 'otu')
   taxa <- asvs[, ..tax_cols]
-  taxa[, species := ifelse(is.na(specificEpithet), NA,
+  taxa[, species := ifelse(is.na(specificEpithet), NA, 
                            paste(genus, specificEpithet))]
   taxa[, specificEpithet := NULL]
-  setcolorder(taxa, c(setdiff(names(taxa), 'otu'), 'otu'))  # Move otu last
-  raw_counts <- merge(taxa, raw_counts, by = "taxonID")
-  norm_counts <- merge(taxa, norm_counts, by = "taxonID")
+  setcolorder(taxa, c(setdiff(names(taxa), 'otu'), 'otu'))
   
-  clade_sums <- list()
-  ranks <- names(taxa)[-1]
-  for (rank in ranks) {
-    clade_sums$raw[[rank]] <-
-      raw_counts[, lapply(.SD, sum, na.rm = TRUE),
-                 by = setNames(list(get(rank)), rank), .SDcols = count_cols]
-    clade_sums$norm[[rank]] <-
-      norm_counts[, lapply(.SD, sum, na.rm = TRUE),
-                  by = setNames(list(get(rank)), rank), .SDcols = count_cols]
+  clade_sums_raw <- list()
+  clade_sums_norm <- list()
+  
+  for (rank in names(taxa)[-1]) {
+    clades <- ifelse(is.na(taxa[[rank]]), "Unclassified", taxa[[rank]])
+    
+    clade_levels <- unique(clades)
+    clade_index <- match(clades, clade_levels)
+    
+    G <- Matrix::sparseMatrix(i = clade_index, j = seq_along(clades), x = 1,
+                              dims = c(length(clade_levels), length(clades)))
+    
+    raw_matrix <- G %*% counts  # Matrix multiplication
+    rownames(raw_matrix) <- clade_levels
+    norm_matrix <- raw_matrix %*% Matrix::Diagonal(x = 1 / Matrix::colSums(raw_matrix))
+    colnames(norm_matrix) <- colnames(raw_matrix)
+    
+    clade_order <- order(rownames(raw_matrix))
+    raw_matrix <- raw_matrix[clade_order, , drop = FALSE]
+    norm_matrix <- norm_matrix[clade_order, , drop = FALSE]
+    
+    clade_sums_raw[[rank]] <- data.table(clade = rownames(raw_matrix), as.matrix(raw_matrix))
+    clade_sums_norm[[rank]] <- data.table(clade = rownames(norm_matrix), as.matrix(norm_matrix))
   }
-  return(clade_sums)
+  return(list(raw = clade_sums_raw, norm = clade_sums_norm))
 }
-
 #' Convert data table(s) to data frame(s) with rownames
 #'
 #' Convert data table(s) into data frame(s), also transforming the first 

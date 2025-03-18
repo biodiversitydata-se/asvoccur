@@ -398,8 +398,9 @@ sum_by_clade <- function(counts, asvs) {
   check_input_category(asvs, 'data.table')
   
   if (!identical(rownames(counts), asvs$taxonID)) {
-    asvs <- asvs[match(rownames(counts), asvs$taxonID)]
-    message("Reordered 'taxa' to match the order of 'counts'.")
+    stop("Mismatch detected: 
+         Row names of 'counts' do not match 'taxonID' of 'asvs'. 
+         Please ensure they are identical.")
   }
   
   tax_cols <- c('taxonID', 'kingdom', 'phylum', 'class', 'order', 'family', 

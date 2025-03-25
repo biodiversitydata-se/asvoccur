@@ -7,15 +7,16 @@
 merge_data(loaded, ds = NULL)
 }
 \arguments{
-\item{loaded}{A multidimensional list of ASV occurrence data table
-elements loaded with \code{\link[=load_data]{load_data()}}.}
+\item{loaded}{A multidimensional list of ASV occurrence data elements loaded 
+with \code{\link[=load_data]{load_data()}}.}
 
 \item{ds}{An optional character vector specifying the datasets
 to merge. If excluded, all datasets will be merged.}
 }
 \value{
-A list of data table elements (\code{counts}, \code{asvs},
-\code{events}, \code{emof}) containing data merged from loaded datasets.
+A list of sparse matrix or data table elements: (\code{counts}, 
+\code{asvs}, \code{events}, \code{emof}) containing data merged from loaded
+datasets.
 }
 \description{
 Merge data from different datasets previously loaded with
@@ -23,29 +24,35 @@ Merge data from different datasets previously loaded with
 }
 \details{
 Takes the output from \code{\link[=load_data]{load_data()}} and merges data from
-different ASV occurrence datasets into four data table objects:
+different ASV occurrence datasets into four sparse matrix or data table objects:
 
 \enumerate{
+
   \item \strong{counts}: Read counts in a \code{taxonID} [row] x 
-     \code{eventID} [col] matrix.
-  \item \strong{asvs}: \code{DNA_sequence}, and taxonomy columns per
-    \code{taxonID}.
-  \item \strong{events}: Basic event metadata in a \code{eventID} [row] x
-    parameter [col] matrix.
+     \code{eventID} [col] sparse matrix.
+     
+  \item \strong{asvs}: DNA sequence and taxonomic assignment of ASVs in a  
+     \code{taxonID} [row] x attribute [col] data table.
+     
+  \item \strong{events}: Basic event metadata in an \code{eventID} [row] x
+    parameter [col] data table.
+    
   \item \strong{emof}: Additional contextual parameter values
-    (\code{measurementValue}) in a \code{eventID} [row]
-    x \code{measurementType} [col] matrix.
+    (\code{measurementValue}) in an \code{eventID} [row]
+    x \code{measurementType} [col] data table.
 }
 
-Merged tables include the UNION of unique rows and events (i.e. sequenced
+Merged matrices and tables include the UNION of unique rows and events (i.e. sequenced
 samples) from loaded datasets. Table asvs includes non-dataset-specific data,
 only, so that we get a single row per unique ASV. Resulting tables are
 returned as elements of a list.
 
-To access an individual table:
+To inspect an individual matrix or data table:
 \describe{
   \item{\code{loaded <- load_data(data_path = './datasets')}}{}
   \item{\code{merged <- merge_data(loaded, ds = c(`first-datasetID`, `second-datasetID`))}}{}
-  \item{\code{View(merged$counts)}}{}
+  \item{\code{View(merged$events)}}{}
+  \item{\code{# OR (to show first 100 ASVs in merged counts matrix):}}{}
+  \item{\code{View(as.matrix(merged$counts[1:100,]))}}{}
 }
 }

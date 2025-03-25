@@ -11,8 +11,8 @@ load_data(data_path = './datasets');
 }
 \value{
 A list of four sublists (\code{counts}, \code{asvs}, \code{events},
-  \code{emof}) containing data table elements from each dataset, indexed by
-  \code{datasetID}.
+  \code{emof}) containing sparse matrice or data table elements from each 
+  dataset, indexed by \code{datasetID}.
 }
 \description{
 Load Amplicon Sequence Variant (ASV) occurrence data from 'Darwin
@@ -21,42 +21,51 @@ Core (DwC)-like' archives downloaded from the Swedish ASP portal,
 }
 \details{
 Reads data from one or more compressed archives. Returns a list of
-  sub lists, each of which contains data table objects (dt:s) from each
-  included dataset:
+  sub lists, each of which contains sparse matrice or data table 
+  objects from each included dataset:
 
 \itemize{
-  \item \strong{counts}: List of dt:s representing read counts
+  \item \strong{counts}: List of sparse matrices representing read counts
     (\code{taxonID} [row] x \code{eventID} [col] matrix) from each dataset.
     \itemize{
-      \item \code{`first-datasetID`} (dt)
-      \item \code{`second-datasetID`} (dt)
+      \item \code{`first-datasetID`} (sparse matrix)
+      \item \code{`second-datasetID`} (sparse matrix)
+      \item ... 
     }
 
-  \item \strong{asvs}: List of dt:s representing `DNA_sequence` and taxonomy
-    per \code{taxonID} from each dataset.
+  \item \strong{asvs}: List of data tables containing the DNA sequence and 
+  taxonomic assignment of ASVs in a \code{taxonID} [row] x attribute [col] format.
+    
     \itemize{
-      \item ...
+      \item \code{`first-datasetID`} (data table)
+      \item \code{`second-datasetID`} (data table)
+      \item ... 
     }
 
- \item \strong{event}: List of dt:s representing basic event/sample metadata
-    in a \code{eventID} [col] x parameter [row] matrix from each dataset.
+ \item \strong{event}: List of data tables representing basic event/sample metadata
+    in a \code{eventID} [col] x parameter [row] format for each dataset.
+    
     \itemize{
-      \item ...
+      \item \code{`first-datasetID`} (data table)
+      \item \code{`second-datasetID`} (data table)
+      \item ... 
     }
 
-  \item \strong{emof}: List of dt:s representing additional contextual
+  \item \strong{emof}: List of data tables representing additional contextual
     parameter values (\code{measurementValue}) in a \code{eventID} [row]
-    x \code{measurementType} [col] matrix from each dataset.
+    x \code{measurementType} [col] format for each dataset.
     \itemize{
-      \item ...
+      \item \code{`first-datasetID`} (data table)
+      \item \code{`second-datasetID`} (data table)
+      \item ... 
     }
 }
 
-To access individual dataset tables:
+To inspect individual matrices or data tables:
 \describe{
   \item{\code{loaded <- load_data(data_path = './datasets')}}{}
-  \item{\code{View(loaded$counts$`first-datasetID`)}}{}
-  \item{\code{# OR:}}{}
-  \item{\code{View(loaded$counts[[1]])}}{}
+  \item{\code{View(loaded$emof$`first-datasetID`)}}{}
+  \item{\code{# OR (to show first 100 ASVs in first counts matrix):}}{}
+  \item{\code{View(as.matrix(loaded$counts[[1]][1:100,]))}}{}
 }
 }

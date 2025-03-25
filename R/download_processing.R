@@ -5,47 +5,56 @@
 #' \url{https://asv-portal.biodiversitydata.se/}.
 #' @param data_path Path of directory containing dataset (*.zip) files
 #' @return A list of four sublists (\code{counts}, \code{asvs}, \code{events},
-#'   \code{emof}) containing data table elements from each dataset, indexed by
-#'   \code{datasetID}.
+#'   \code{emof}) containing sparse matrice or data table elements from each 
+#'   dataset, indexed by \code{datasetID}.
 #' @usage load_data(data_path = './datasets');
 #' @details Reads data from one or more compressed archives. Returns a list of
-#'   sub lists, each of which contains data table objects (dt:s) from each
-#'   included dataset:
+#'   sub lists, each of which contains sparse matrice or data table 
+#'   objects from each included dataset:
 #'
 #' \itemize{
-#'   \item \strong{counts}: List of dt:s representing read counts
+#'   \item \strong{counts}: List of sparse matrices representing read counts
 #'     (\code{taxonID} [row] x \code{eventID} [col] matrix) from each dataset.
 #'     \itemize{
-#'       \item \code{`first-datasetID`} (dt)
-#'       \item \code{`second-datasetID`} (dt)
+#'       \item \code{`first-datasetID`} (sparse matrix)
+#'       \item \code{`second-datasetID`} (sparse matrix)
+#'       \item ... 
 #'     }
 #'
-#'   \item \strong{asvs}: List of dt:s representing `DNA_sequence` and taxonomy
-#'     per \code{taxonID} from each dataset.
+#'   \item \strong{asvs}: List of data tables containing the DNA sequence and 
+#'   taxonomic assignment of ASVs in a \code{taxonID} [row] x attribute [col] format.
+#'     
 #'     \itemize{
-#'       \item ...
+#'       \item \code{`first-datasetID`} (data table)
+#'       \item \code{`second-datasetID`} (data table)
+#'       \item ... 
 #'     }
 #'
-#'  \item \strong{event}: List of dt:s representing basic event/sample metadata
-#'     in a \code{eventID} [col] x parameter [row] matrix from each dataset.
+#'  \item \strong{event}: List of data tables representing basic event/sample metadata
+#'     in a \code{eventID} [col] x parameter [row] format for each dataset.
+#'     
 #'     \itemize{
-#'       \item ...
+#'       \item \code{`first-datasetID`} (data table)
+#'       \item \code{`second-datasetID`} (data table)
+#'       \item ... 
 #'     }
 #'
-#'   \item \strong{emof}: List of dt:s representing additional contextual
+#'   \item \strong{emof}: List of data tables representing additional contextual
 #'     parameter values (\code{measurementValue}) in a \code{eventID} [row]
-#'     x \code{measurementType} [col] matrix from each dataset.
+#'     x \code{measurementType} [col] format for each dataset.
 #'     \itemize{
-#'       \item ...
+#'       \item \code{`first-datasetID`} (data table)
+#'       \item \code{`second-datasetID`} (data table)
+#'       \item ... 
 #'     }
 #' }
 #'
-#' To access individual dataset tables:
+#' To inspect individual matrices or data tables:
 #' \describe{
 #'   \item{\code{loaded <- load_data(data_path = './datasets')}}{}
-#'   \item{\code{View(loaded$counts$`first-datasetID`)}}{}
-#'   \item{\code{# OR:}}{}
-#'   \item{\code{View(loaded$counts[[1]])}}{}
+#'   \item{\code{View(loaded$emof$`first-datasetID`)}}{}
+#'   \item{\code{# OR (to show first 100 ASVs in first counts matrix):}}{}
+#'   \item{\code{View(as.matrix(loaded$counts[[1]][1:100,]))}}{}
 #' }
 #' @export
 load_data <- function(data_path = './datasets') {
@@ -150,7 +159,8 @@ load_data <- function(data_path = './datasets') {
 
 
 # Internal functions to check that input to downstream functions is
-# data table- (or matrix-) based and matches the level of complexity accepted by the function.
+# data table- or matrix-based, and matches the level of complexity accepted by 
+# the function.
 get_input_category <- function(input) {
   
   is_dt <- function(input) {  # E.g. 'merged$asvs'
@@ -197,39 +207,46 @@ check_input_category <- function(input, lowest_cat) {
 #' 
 #' Merge data from different datasets previously loaded with
 #' \code{\link[=load_data]{load_data()}} function.
-#' @param loaded A multidimensional list of ASV occurrence data table
-#' elements loaded with \code{\link[=load_data]{load_data()}}.
+#' @param loaded A multidimensional list of ASV occurrence data elements loaded 
+#' with \code{\link[=load_data]{load_data()}}.
 #' @param ds An optional character vector specifying the datasets
 #'   to merge. If excluded, all datasets will be merged.
-#' @return A list of data table elements (\code{counts}, \code{asvs},
-#' \code{events}, \code{emof}) containing data merged from loaded datasets.
+#' @return A list of sparse matrix or data table elements: (\code{counts}, 
+#' \code{asvs}, \code{events}, \code{emof}) containing data merged from loaded
+#' datasets.
 #' @usage merge_data(loaded, ds = NULL)
 #' @details 
 #' Takes the output from \code{\link[=load_data]{load_data()}} and merges data from
-#' different ASV occurrence datasets into four data table objects:
+#' different ASV occurrence datasets into four sparse matrix or data table objects:
 #' 
 #' \enumerate{
+#' 
 #'   \item \strong{counts}: Read counts in a \code{taxonID} [row] x 
-#'      \code{eventID} [col] matrix.
-#'   \item \strong{asvs}: \code{DNA_sequence}, and taxonomy columns per
-#'     \code{taxonID}.
-#'   \item \strong{events}: Basic event metadata in a \code{eventID} [row] x
-#'     parameter [col] matrix.
+#'      \code{eventID} [col] sparse matrix.
+#'      
+#'   \item \strong{asvs}: DNA sequence and taxonomic assignment of ASVs in a  
+#'      \code{taxonID} [row] x attribute [col] data table.
+#'      
+#'   \item \strong{events}: Basic event metadata in an \code{eventID} [row] x
+#'     parameter [col] data table.
+#'     
 #'   \item \strong{emof}: Additional contextual parameter values
-#'     (\code{measurementValue}) in a \code{eventID} [row]
-#'     x \code{measurementType} [col] matrix.
+#'     (\code{measurementValue}) in an \code{eventID} [row]
+#'     x \code{measurementType} [col] data table.
 #' }
 #' 
-#' Merged tables include the UNION of unique rows and events (i.e. sequenced
+#' Merged matrices and tables include the UNION of unique rows and events (i.e. sequenced
 #' samples) from loaded datasets. Table asvs includes non-dataset-specific data,
 #' only, so that we get a single row per unique ASV. Resulting tables are
 #' returned as elements of a list.
 #' 
-#' To access an individual table:
+#' To inspect an individual matrix or data table:
 #' \describe{
 #'   \item{\code{loaded <- load_data(data_path = './datasets')}}{}
 #'   \item{\code{merged <- merge_data(loaded, ds = c(`first-datasetID`, `second-datasetID`))}}{}
-#'   \item{\code{View(merged$counts)}}{}
+#'   \item{\code{View(merged$events)}}{}
+#'   \item{\code{# OR (to show first 100 ASVs in merged counts matrix):}}{}
+#'   \item{\code{View(as.matrix(merged$counts[1:100,]))}}{}
 #' }
 #' @export
 merge_data <- function(loaded, ds = NULL) {
@@ -354,11 +371,11 @@ merge_data <- function(loaded, ds = NULL) {
 #' ranks, for each sample in a \code{\link[=load_data]{loaded}} or
 #' \code{\link[=merge_data]{merged}} ASV occurrence dataset.
 #'
-#' @param counts A data table with ASV read counts in a taxonID [row] x eventID
-#'   [col] matrix, from a \code{\link[=load_data]{loaded}} or
+#' @param counts ASV read counts in a taxonID [row] x eventID
+#'   [col] sparse matrix, from a \code{\link[=load_data]{loaded}} or
 #'   \code{\link[=merge_data]{merged}} ASV occurrence dataset.
-#' @param asvs A data table containing the taxonomic classification of ASV:s
-#'   included in the \code{counts} data table.
+#' @param asvs A data table containing the DNA sequences and taxonomic assignment
+#'   of ASV:s included in the \code{counts} matrix.
 #' @return A list containing two sub-lists: `raw` and `norm`, each including
 #'   data tables for summed ASV counts at each taxonomic rank.
 #' @usage sum_by_clade(counts, asvs)
@@ -366,22 +383,23 @@ merge_data <- function(loaded, ds = NULL) {
 #'   clades, at specified taxonomic ranks, to provide higher-level views of the
 #'   data. The function normalizes ASV read counts by total counts per sample,
 #'   and returns a list of two sub list, each of which contains data tables
-#'   (dt:s) of summed counts for each taxonomic rank:
+#'   of summed counts for each taxonomic rank:
 #'
 #' \itemize{
-#'   \item \strong{raw}: List of dt:s showing raw read counts summed by 
+#'   \item \strong{raw}: List of data tables showing raw read counts summed by 
 #'   clade at different taxonomic ranks.
 #'     \itemize{
-#'       \item \code{kingdom} (dt)
+#'       \item \code{kingdom} (data table)
 #'       \item ...
-#'       \item \code{species} (dt)
+#'       \item \code{species} (data table)
 #'     }
-#'   \item \strong{norm}: List of dt:s representing normalized read counts 
+#'     
+#'   \item \strong{norm}: List of data tables representing normalized read counts 
 #'   summed by clade at different taxonomic ranks.
 #'     \itemize{
-#'       \item \code{kingdom} (dt)
+#'       \item \code{kingdom} (data table)
 #'       \item ...
-#'       \item \code{species} (dt)
+#'       \item \code{species} (data table)
 #'     }
 #' }
 #' #' To view an individual table:

@@ -7,12 +7,12 @@
 sum_by_clade(counts, asvs)
 }
 \arguments{
-\item{counts}{A data table with ASV read counts in a taxonID [row] x eventID
-[col] matrix, from a \code{\link[=load_data]{loaded}} or
+\item{counts}{ASV read counts in a taxonID [row] x eventID
+[col] sparse matrix, from a \code{\link[=load_data]{loaded}} or
 \code{\link[=merge_data]{merged}} ASV occurrence dataset.}
 
-\item{asvs}{A data table containing the taxonomic classification of ASV:s
-included in the \code{counts} data table.}
+\item{asvs}{A data table containing the DNA sequences and taxonomic assignment
+of ASV:s included in the \code{counts} matrix.}
 }
 \value{
 A list containing two sub-lists: `raw` and `norm`, each including
@@ -28,22 +28,23 @@ Sums raw and normalized read counts across ASVs within distinct
   clades, at specified taxonomic ranks, to provide higher-level views of the
   data. The function normalizes ASV read counts by total counts per sample,
   and returns a list of two sub list, each of which contains data tables
-  (dt:s) of summed counts for each taxonomic rank:
+  of summed counts for each taxonomic rank:
 
 \itemize{
-  \item \strong{raw}: List of dt:s showing raw read counts summed by 
+  \item \strong{raw}: List of data tables showing raw read counts summed by 
   clade at different taxonomic ranks.
     \itemize{
-      \item \code{kingdom} (dt)
+      \item \code{kingdom} (data table)
       \item ...
-      \item \code{species} (dt)
+      \item \code{species} (data table)
     }
-  \item \strong{norm}: List of dt:s representing normalized read counts 
+    
+  \item \strong{norm}: List of data tables representing normalized read counts 
   summed by clade at different taxonomic ranks.
     \itemize{
-      \item \code{kingdom} (dt)
+      \item \code{kingdom} (data table)
       \item ...
-      \item \code{species} (dt)
+      \item \code{species} (data table)
     }
 }
 #' To view an individual table:

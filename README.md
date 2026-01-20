@@ -20,7 +20,7 @@ GitHub installations (local builds) may occasionally fail. If so:
 ```R
 remove.packages("asvoccur")
 # restart R / RStudio
-remotes::install_github("biodiversitydata-se/asvoccur@develop", force = TRUE)
+install_github("biodiversitydata-se/asvoccur@develop", force = TRUE)
 ```
 
 ## Run

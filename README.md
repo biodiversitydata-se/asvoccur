@@ -15,8 +15,14 @@ install_github("biodiversitydata-se/asvoccur")
 # or:
 # install_github("biodiversitydata-se/asvoccur@develop")
 library(asvoccur)
-
 ```
+GitHub installations (local builds) may occasionally fail. If so:
+```R
+remove.packages("asvoccur")
+# restart R / RStudio
+remotes::install_github("biodiversitydata-se/asvoccur@develop", force = TRUE)
+```
+
 ## Run
 ```R
 data_path <- '/path-to/dataset-folder'

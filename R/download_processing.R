@@ -5,47 +5,58 @@
 #' \url{https://asv-portal.biodiversitydata.se/}.
 #' @param data_path Path of directory containing dataset (*.zip) files
 #' @return A list of four sublists (\code{counts}, \code{asvs}, \code{events},
-#'   \code{emof}) containing data table elements from each dataset, indexed by
-#'   \code{datasetID}.
+#'   \code{emof}) containing sparse matrix or data table elements from each 
+#'   dataset, indexed by \code{datasetID}.
 #' @usage load_data(data_path = './datasets');
 #' @details Reads data from one or more compressed archives. Returns a list of
-#'   sub lists, each of which contains data table objects (dt:s) from each
-#'   included dataset:
+#'   sub lists, each of which contains sparse matrix or data table 
+#'   objects from each included dataset:
 #'
 #' \itemize{
-#'   \item \strong{counts}: List of dt:s representing read counts
-#'     (\code{taxonID} [row] x \code{eventID} [col] matrix) from each dataset.
+#'   \item \strong{counts}: List of sparse matrices representing read counts
+#'     (taxon [row] x event [col] sparse matrix) from each dataset.
 #'     \itemize{
-#'       \item \code{`first-datasetID`} (dt)
-#'       \item \code{`second-datasetID`} (dt)
-#'     }
-#'
-#'   \item \strong{asvs}: List of dt:s representing `DNA_sequence` and taxonomy
-#'     per \code{taxonID} from each dataset.
-#'     \itemize{
+#'       \item \code{`first-datasetID`} (sparse matrix)
+#'       \item \code{`second-datasetID`} (sparse matrix)
 #'       \item ...
 #'     }
 #'
-#'  \item \strong{event}: List of dt:s representing basic event/sample metadata
-#'     in a \code{eventID} [col] x parameter [row] matrix from each dataset.
+#'   \item \strong{asvs}: List of data tables containing the DNA sequence and
+#'     taxonomic assignment of ASVs (taxon [row] x attribute [col]) from each dataset.
+#'
 #'     \itemize{
+#'       \item \code{`first-datasetID`} (data table)
+#'       \item \code{`second-datasetID`} (data table)
 #'       \item ...
 #'     }
 #'
-#'   \item \strong{emof}: List of dt:s representing additional contextual
-#'     parameter values (\code{measurementValue}) in a \code{eventID} [row]
-#'     x \code{measurementType} [col] matrix from each dataset.
+#'   \item \strong{events}: List of data tables representing basic event/sample
+#'     metadata (event [row] x parameter [col]) from each dataset.
+#'
 #'     \itemize{
+#'       \item \code{`first-datasetID`} (data table)
+#'       \item \code{`second-datasetID`} (data table)
+#'       \item ...
+#'     }
+#'
+#'   \item \strong{emof}: List of data tables representing additional contextual
+#'     parameter values (event [row] x measurementType [col]) from each dataset.
+#'     \itemize{
+#'       \item \code{`first-datasetID`} (data table)
+#'       \item \code{`second-datasetID`} (data table)
 #'       \item ...
 #'     }
 #' }
 #'
-#' To access individual dataset tables:
+#' To inspect individual matrices or data tables:
 #' \describe{
 #'   \item{\code{loaded <- load_data(data_path = './datasets')}}{}
-#'   \item{\code{View(loaded$counts$`first-datasetID`)}}{}
-#'   \item{\code{# OR:}}{}
-#'   \item{\code{View(loaded$counts[[1]])}}{}
+#'   \item{\code{View(loaded$emof$`first-datasetID`)}}{}
+#'   \item{\code{# OR (to show first 100 ASVs in first counts matrix):}}{}
+#'   \item{\strong{Memory note:} `counts` is a sparse matrix; converting large
+#'     matrices to dense format (e.g. `as.matrix()`) may exhaust RAM. Only convert
+#'     small subsets for inspection.}{}
+#'   \item{\code{View(as.matrix(loaded$counts[[1]][1:100,]))}}{}
 #' }
 #' @export
 load_data <- function(data_path = './datasets') {
@@ -65,23 +76,30 @@ load_data <- function(data_path = './datasets') {
       stop(paste("Invalid filename detected:", paste0("'",id,".zip'\n"),
                  "Please resolve before proceeding."))
   
-  # Reads & reshapes occurrence.tsv into wide (taxonID x eventID) format
+  # Reads & reshapes occurrence.tsv into sparse (!) and wide (taxonID x eventID) format
   get_counts <- function(zip) {
-    occurrences <- fread(cmd = paste('unzip -p', zip, 'occurrence.tsv'))
-    counts <- dcast(occurrences, taxonID ~ eventID,
-                       value.var = "organismQuantity", fill = 0)
-    setkey(counts, taxonID)
-    # Set counts to integer
-    counts[, names(counts)[-1] := lapply(.SD, as.integer), .SDcols = -1]
+    occurrences <- fread(utils::unzip(zip, files = "occurrence.tsv", 
+                                      exdir = tempdir()))
+    occurrences[, taxonID := as.factor(taxonID)]
+    occurrences[, eventID := as.factor(eventID)]
+    
+    counts <- Matrix::sparseMatrix(
+      i = as.integer(occurrences$taxonID),
+      j = as.integer(occurrences$eventID),
+      x = occurrences$organismQuantity,
+      dims = c(nlevels(occurrences$taxonID), nlevels(occurrences$eventID)),
+      dimnames = list(levels(occurrences$taxonID), levels(occurrences$eventID))
+    )
+    
     return(counts)
   }
   
   # Reads ASV sequence and taxonomy from asv.tsv
   get_asvs <- function(zip) {
-    asvs <- fread(cmd = paste('unzip -p', zip, 'asv.tsv'))
+    asvs <- fread(utils::unzip(zip, files = "asv.tsv", exdir = tempfile()))
     asvs[, dataset_pid := NULL] # Col for admin use only
     # Replace "" with NA in taxonomy
-    tax_cols <- c("kingdom", "phylum", "class", "order", "family", "genus",
+    tax_cols <- c("kingdom", "phylum", "order", "class", "family", "genus",
                   "specificEpithet", "infraspecificEpithet", "otu")       
     asvs[, (tax_cols) := lapply(.SD, function(x) ifelse(x == "", NA, x)),
          .SDcols = tax_cols]
@@ -91,7 +109,7 @@ load_data <- function(data_path = './datasets') {
   
   # Reads and reshapes events.tsv
   get_events <- function(zip) {
-    events <- fread(cmd = paste('unzip -p', zip, 'event.tsv'))
+    events <- fread(utils::unzip(zip, files = "event.tsv", exdir = tempfile()))
     events[, c("dataset_pid", "datasetName", "ipt_resource_id") := NULL]
     setkey(events, eventID)
     return(events)
@@ -99,8 +117,8 @@ load_data <- function(data_path = './datasets') {
   
   get_datasets <- function(zip) {
     ds_cols <- c("eventID", "datasetName")
-    datasets <- fread(cmd = paste('unzip -p', zip, 'event.tsv'), 
-                      select = ds_cols)
+    datasets <- fread(utils::unzip(zip, files = "event.tsv", 
+                                   exdir = tempfile()), select = ds_cols)
     datasets[, datasetID := strsplit(eventID, ":")[[1]][1]]
     datasets[, eventID := NULL]
     setcolorder(datasets, c("datasetID", "datasetName"))
@@ -112,11 +130,14 @@ load_data <- function(data_path = './datasets') {
   # [eventID x measurementType (measurementUnit)]
   # and drops remaining fields, e.g.measurementMethod & measurementRemarks!
   get_emof <- function(zip) {
-    emof <- fread(cmd = paste('unzip -p', zip, 'emof.tsv'))
-    event_ids <- fread(cmd = paste('unzip -p', zip, 'event.tsv'), select = "eventID")
+    emof <- fread(utils::unzip(zip, files = "emof.tsv", exdir = tempfile()))
+    event_ids <- fread(utils::unzip(zip, files = 'event.tsv', exdir = tempfile()), 
+                       select = "eventID")
+
     # Handle datasets that have no contextual data
-    if (nrow(emof) == 0) {
-      message("Adding empty emof table for ", gsub(".zip", "", zip))
+    if (nrow(emof) == 0) { warning("load_data(): Adding empty emof table for ", 
+                                   gsub("\\.zip$", "", basename(zip)),
+                                   call. = FALSE)
       emof <- data.table(eventID = event_ids$eventID)
     } else {
       emof <- dcast(emof, 
@@ -140,30 +161,43 @@ load_data <- function(data_path = './datasets') {
 }
 
 
-# Internal functions to check that input to downstream functions is 
-# data table-based and matches the level of complexity accepted by the function.
+# Internal functions to check that input to downstream functions is
+# data table- or matrix-based, and matches the level of complexity accepted by 
+# the function.
 get_input_category <- function(input) {
+  
   is_dt <- function(input) {  # E.g. 'merged$asvs'
     return(inherits(input, "data.table"))}
+  is_sp_mat <- function(input) {  # E.g. 'loaded$counts'
+    return(inherits(input, "sparseMatrix"))}
+  # Check if input is a list containing data.tables or sparse matrices
   is_dt_lst <- function(input) {  # E.g. 'loaded$asvs', or 'merged'
-    return(is.list(input) && all(sapply(input, is_dt)))}
+    return(is.list(input) && all(sapply(input, function(x) is_dt(x) || is_sp_mat(x))))}
+  # Check if input is a parent list (list of lists) containing data.table or sparse matrix
   is_p_lst <- function(input) {  # 'Parent list' of sub lists E.g. 'loaded'
-    return(is.list(input) && all(sapply(input, function(y) is_dt_lst(y))))}
+    return(is.list(input) && all(sapply(input, function(y) is_dt_lst(y) || is_sp_mat(y))))}
+  
   if (is_dt(input)) return('dt')
   if (is_dt_lst(input)) return('dt_lst')
   if (is_p_lst(input)) return('p_lst')
-  return(FALSE)  # Non-dt-based input
+  if (is_sp_mat(input)) return('sp_mat')
+  return(FALSE)  # Non-dt or matrix-based input
 }
+
 check_input_category <- function(input, lowest_cat) {
   actual_cat <- get_input_category(input)
   errors <- list(
-    dt = "Input must be a data table or a (possibly hierachical) list of data tables",
-    dt_lst = "Input must be a (possibly hierachical) list of data tables",
-    p_lst = "Input must be a hierarchical list of data tables."
+    dt = "Input must be a data table or a (possibly hierachical) list of data tables and matrice",
+    sp_mat = "Input must be a sparse matrix or a (possibly hierachical) list of data tables and matrice",
+    dt_lst = "Input must be a (possibly hierachical) list of data tables and matrice",
+    p_lst = "Input must be a hierarchical list of data tables and matrice"
   )
   if (lowest_cat == "dt") {
     if (actual_cat %in% c("dt", "dt_lst", "p_lst")) {
       return(TRUE) } else { stop(errors$dt) }}
+  if (lowest_cat == "sp_mat") {
+    if (actual_cat %in% c("sp_mat", "dt_lst", "p_lst")) {
+      return(TRUE) } else { stop(errors$sp_mat) }}
   if (lowest_cat == "dt_lst") {
     if (actual_cat %in% c("dt_lst", "p_lst")) {
       return(TRUE) } else { stop(errors$dt_lst) }}
@@ -176,39 +210,46 @@ check_input_category <- function(input, lowest_cat) {
 #' 
 #' Merge data from different datasets previously loaded with
 #' \code{\link[=load_data]{load_data()}} function.
-#' @param loaded A multidimensional list of ASV occurrence data table
-#' elements loaded with \code{\link[=load_data]{load_data()}}.
+#' @param loaded A multidimensional list of ASV occurrence data elements loaded 
+#' with \code{\link[=load_data]{load_data()}}.
 #' @param ds An optional character vector specifying the datasets
 #'   to merge. If excluded, all datasets will be merged.
-#' @return A list of data table elements (\code{counts}, \code{asvs},
-#' \code{events}, \code{emof}) containing data merged from loaded datasets.
+#' @return A list of sparse matrix or data table elements: (\code{counts}, 
+#' \code{asvs}, \code{events}, \code{emof}) containing data merged from loaded
+#' datasets.
 #' @usage merge_data(loaded, ds = NULL)
 #' @details 
 #' Takes the output from \code{\link[=load_data]{load_data()}} and merges data from
-#' different ASV occurrence datasets into four data table objects:
+#' different ASV occurrence datasets into four sparse matrix or data table objects:
 #' 
 #' \enumerate{
+#' 
 #'   \item \strong{counts}: Read counts in a \code{taxonID} [row] x 
-#'      \code{eventID} [col] matrix.
-#'   \item \strong{asvs}: \code{DNA_sequence}, and taxonomy columns per
-#'     \code{taxonID}.
-#'   \item \strong{events}: Basic event metadata in a \code{eventID} [row] x
-#'     parameter [col] matrix.
+#'      \code{eventID} [col] sparse matrix.
+#'      
+#'   \item \strong{asvs}: DNA sequence and taxonomic assignment of ASVs in a  
+#'      \code{taxonID} [row] x attribute [col] data table.
+#'      
+#'   \item \strong{events}: Basic event metadata in an \code{eventID} [row] x
+#'     parameter [col] data table.
+#'     
 #'   \item \strong{emof}: Additional contextual parameter values
-#'     (\code{measurementValue}) in a \code{eventID} [row]
-#'     x \code{measurementType} [col] matrix.
+#'     (\code{measurementValue}) in an \code{eventID} [row]
+#'     x \code{measurementType} [col] data table.
 #' }
 #' 
-#' Merged tables include the UNION of unique rows and events (i.e. sequenced
+#' Merged matrices and tables include the UNION of unique rows and events (i.e. sequenced
 #' samples) from loaded datasets. Table asvs includes non-dataset-specific data,
 #' only, so that we get a single row per unique ASV. Resulting tables are
 #' returned as elements of a list.
 #' 
-#' To access an individual table:
+#' To inspect an individual matrix or data table:
 #' \describe{
 #'   \item{\code{loaded <- load_data(data_path = './datasets')}}{}
 #'   \item{\code{merged <- merge_data(loaded, ds = c(`first-datasetID`, `second-datasetID`))}}{}
-#'   \item{\code{View(merged$counts)}}{}
+#'   \item{\code{View(merged$events)}}{}
+#'   \item{\code{# OR (to show first 100 ASVs in merged counts matrix):}}{}
+#'   \item{\code{View(as.matrix(merged$counts[1:100,]))}}{}
 #' }
 #' @export
 merge_data <- function(loaded, ds = NULL) {
@@ -228,14 +269,11 @@ merge_data <- function(loaded, ds = NULL) {
     }
   }
   
-  merged <- list()
-  
-  merged$counts <- Reduce(function(x, y)
-    merge(x, y, by = "taxonID", all = TRUE), loaded$counts[ds])
-  
   # Checks for overlaps in eventID between datasets to be merged
-  detect_event_duplicates <- function(x, y) {
-    duplicates <- intersect(x$eventID, y$eventID)
+  detect_event_duplicates <- function(x, y, is_sparse = FALSE) {
+    event_x <- if (is_sparse) colnames(x) else x$eventID
+    event_y <- if (is_sparse) colnames(y) else y$eventID
+    duplicates <- intersect(event_x, event_y)
     if (length(duplicates) > 0) { 
       msg <- paste("Duplicated eventID(s) found in datasets to be merged:\n",
                    paste(duplicates, collapse = ", "), "\n",
@@ -244,6 +282,29 @@ merge_data <- function(loaded, ds = NULL) {
       stop(msg)
     }
   }
+  
+  merged <- list()
+  
+  # Iteratively merges sparse matrices with union of ASVs and events
+  merge_sparse_counts <- function(matrices) {
+    all_asvs <- unique(unlist(lapply(matrices, rownames)))
+    # Add missing ASVs and sort identically across matrices
+    padded_matrices <- lapply(matrices, function(mat) {
+      missing_asvs <- setdiff(all_asvs, rownames(mat))
+      if (length(missing_asvs) > 0) {  # Set missing counts to 0
+        empty_mat <- Matrix::Matrix(0, nrow = length(missing_asvs), ncol = ncol(mat),
+                            dimnames = list(missing_asvs, colnames(mat)))
+        mat <- rbind(mat, empty_mat)
+      }
+      mat[order(rownames(mat)), , drop = FALSE]
+    })
+    Reduce(function(x, y) {
+      detect_event_duplicates(x, y, is_sparse = TRUE)
+      Matrix::cbind2(x, y)
+    }, padded_matrices)
+  }
+  merged$counts <- merge_sparse_counts(loaded$counts[ds])
+  
   # Reapplies numeric data type to cols (after merging as char)
   restore_numeric <- function(dt){
     dt[, names(dt) := lapply(.SD, function(col) {
@@ -258,7 +319,7 @@ merge_data <- function(loaded, ds = NULL) {
     x <- x[, lapply(.SD, as.character)]
     y <- y[, lapply(.SD, as.character)]
     rbindlist(list(x, y), use.names = TRUE, fill = TRUE)
-    }, loaded$events[ds]))
+  }, loaded$events[ds]))
   setkey(merged$events, eventID)
   
   merged$datasets <- restore_numeric(Reduce(function(x, y){
@@ -272,12 +333,12 @@ merge_data <- function(loaded, ds = NULL) {
     x <- x[, lapply(.SD, as.character)]
     y <- y[, lapply(.SD, as.character)]
     rbindlist(list(x, y), use.names = TRUE, fill = TRUE)
-    }, loaded$emof[ds]))
+  }, loaded$emof[ds]))
   setkey(merged$emof, eventID)
   
   # We want 1 row/ASV, so only merge non-dataset-specific cols here
   merge_cols <- c("taxonID", "DNA_sequence", "scientificName", "taxonRank",
-                  "kingdom" ,"phylum", "class", "order", "family", "genus",
+                  "kingdom" ,"phylum", "order", "class", "family", "genus",
                   "specificEpithet", "infraspecificEpithet", "otu",
                   "identificationReferences", "identificationRemarks")
   merged$asvs <- Reduce(function(x, y)
@@ -287,7 +348,7 @@ merge_data <- function(loaded, ds = NULL) {
   
   # Identifies duplicated ASVs with inconsistent taxonomy across datasets,
   # likely due to merging datasets downloaded at different times
-  # (pre- and post-reannotation).
+  # (pre- and post-annotation update).
   get_inconsistent_asvs <- function(merged_asvs, loaded_lst) {
     ids <- merged_asvs$taxonID[duplicated(merged_asvs$taxonID)]
     if (length(ids) == 0) return(NULL) # If no duplicates, stop here
@@ -313,11 +374,11 @@ merge_data <- function(loaded, ds = NULL) {
 #' ranks, for each sample in a \code{\link[=load_data]{loaded}} or
 #' \code{\link[=merge_data]{merged}} ASV occurrence dataset.
 #'
-#' @param counts A data table with ASV read counts in a taxonID [row] x eventID
-#'   [col] matrix, from a \code{\link[=load_data]{loaded}} or
+#' @param counts ASV read counts in a taxon [row] x event [col] sparse matrix, 
+#' from a \code{\link[=load_data]{loaded}} or
 #'   \code{\link[=merge_data]{merged}} ASV occurrence dataset.
-#' @param asvs A data table containing the taxonomic classification of ASV:s
-#'   included in the \code{counts} data table.
+#' @param asvs A data table containing the DNA sequences and taxonomic assignment
+#'   of ASV:s included in the \code{counts} matrix.
 #' @return A list containing two sub-lists: `raw` and `norm`, each including
 #'   data tables for summed ASV counts at each taxonomic rank.
 #' @usage sum_by_clade(counts, asvs)
@@ -325,22 +386,23 @@ merge_data <- function(loaded, ds = NULL) {
 #'   clades, at specified taxonomic ranks, to provide higher-level views of the
 #'   data. The function normalizes ASV read counts by total counts per sample,
 #'   and returns a list of two sub list, each of which contains data tables
-#'   (dt:s) of summed counts for each taxonomic rank:
+#'   of summed counts for each taxonomic rank:
 #'
 #' \itemize{
-#'   \item \strong{raw}: List of dt:s showing raw read counts summed by 
+#'   \item \strong{raw}: List of data tables showing raw read counts summed by 
 #'   clade at different taxonomic ranks.
 #'     \itemize{
-#'       \item \code{kingdom} (dt)
+#'       \item \code{kingdom} (data table)
 #'       \item ...
-#'       \item \code{species} (dt)
+#'       \item \code{species} (data table)
 #'     }
-#'   \item \strong{norm}: List of dt:s representing normalized read counts 
+#'     
+#'   \item \strong{norm}: List of data tables representing normalized read counts 
 #'   summed by clade at different taxonomic ranks.
 #'     \itemize{
-#'       \item \code{kingdom} (dt)
+#'       \item \code{kingdom} (data table)
 #'       \item ...
-#'       \item \code{species} (dt)
+#'       \item \code{species} (data table)
 #'     }
 #' }
 #' #' To view an individual table:
@@ -351,38 +413,54 @@ merge_data <- function(loaded, ds = NULL) {
 #'   \item{\code{View(summed$raw$family)}}{}
 #' }
 #' @export
-sum_by_clade <- function(counts, asvs){
+sum_by_clade <- function(counts, asvs) {
   
-  check_input_category(counts, 'dt')
+  check_input_category(counts, 'sp_mat')
   check_input_category(asvs, 'dt')
   
-  raw_counts <- counts
-  count_cols <- names(counts)[-1]  # Drop taxonID
-  norm_counts <- copy(raw_counts)
-  norm_counts[, (count_cols) := lapply(.SD, function(x) x/sum(x, na.rm = TRUE)),
-              .SDcols = count_cols]
+  if (!identical(rownames(counts), asvs$taxonID)) {
+    stop("Mismatch detected: 
+         Row names of 'counts' do not match 'taxonID' of 'asvs'. 
+         Please ensure they are identical.")
+  }
   
-  tax_cols <- c('taxonID', 'kingdom', 'phylum', 'class', 'order', 'family',
+  tax_cols <- c('taxonID', 'kingdom', 'phylum', 'class', 'order', 'family', 
                 'genus', 'specificEpithet', 'otu')
   taxa <- asvs[, ..tax_cols]
-  taxa[, species := ifelse(is.na(specificEpithet), NA,
+  taxa[, species := ifelse(is.na(specificEpithet), NA, 
                            paste(genus, specificEpithet))]
   taxa[, specificEpithet := NULL]
-  setcolorder(taxa, c(setdiff(names(taxa), 'otu'), 'otu'))  # Move otu last
-  raw_counts <- merge(taxa, raw_counts, by = "taxonID")
-  norm_counts <- merge(taxa, norm_counts, by = "taxonID")
+  setcolorder(taxa, c(setdiff(names(taxa), 'otu'), 'otu'))
   
-  clade_sums <- list()
-  ranks <- names(taxa)[-1]
-  for (rank in ranks) {
-    clade_sums$raw[[rank]] <-
-      raw_counts[, lapply(.SD, sum, na.rm = TRUE),
-                 by = setNames(list(get(rank)), rank), .SDcols = count_cols]
-    clade_sums$norm[[rank]] <-
-      norm_counts[, lapply(.SD, sum, na.rm = TRUE),
-                  by = setNames(list(get(rank)), rank), .SDcols = count_cols]
+  clade_sums_raw <- list()
+  clade_sums_norm <- list()
+  
+  for (rank in names(taxa)[-1]) {
+    clades <- ifelse(is.na(taxa[[rank]]), "Unclassified", taxa[[rank]])
+    
+    clade_levels <- unique(clades)
+    clade_index <- match(clades, clade_levels)
+    
+    # Aggregate using matrix multiplication
+    G <- Matrix::sparseMatrix(i = clade_index, j = seq_along(clades), x = 1,
+                              dims = c(length(clade_levels), length(clades)))
+    raw_matrix <- G %*% counts
+    rownames(raw_matrix) <- clade_levels
+    
+    # Normalise
+    norm_matrix <- raw_matrix %*% Matrix::Diagonal(x = 1 / Matrix::colSums(raw_matrix))
+    colnames(norm_matrix) <- colnames(raw_matrix)
+   
+     # Sort clades
+    clade_order <- order(rownames(raw_matrix))
+    raw_matrix <- raw_matrix[clade_order, , drop = FALSE]
+    norm_matrix <- norm_matrix[clade_order, , drop = FALSE]
+    
+    # Convert to dt:s
+    clade_sums_raw[[rank]] <- data.table(clade = rownames(raw_matrix), as.matrix(raw_matrix))
+    clade_sums_norm[[rank]] <- data.table(clade = rownames(norm_matrix), as.matrix(norm_matrix))
   }
-  return(clade_sums)
+  return(list(raw = clade_sums_raw, norm = clade_sums_norm))
 }
 
 #' Convert data table(s) to data frame(s) with rownames
@@ -409,24 +487,43 @@ sum_by_clade <- function(counts, asvs){
 #'   \item{\code{merged_df <- convert_to_df(merged)}}{}
 #' }
 #' @export
+# Convert data.tables to data.frames (first column -> rownames).
+# Leave sparse matrices (counts) untouched and warn once listing where they were skipped.
 convert_to_df <- function(dt_obj) {
+  is_dt    <- function(z) inherits(z, "data.table")
+  is_spmat <- function(z) inherits(z, "sparseMatrix") || inherits(z, "Matrix")
   
-  check_input_category(dt_obj, 'dt')
-  
-  # Converts single dt to df, and first dt col to df rownames
+  # data.table -> data.frame with first column as rownames
   dt_to_df <- function(dt) {
     df <- as.data.frame(dt)
-    df[[1]][is.na(df[[1]])] <- "Unnamed-clades"  # Make usable as rowname
-    rownames(df) <- df[[1]]
+    v <- df[[1]]; v[is.na(v)] <- "Unnamed-clades"
+    rownames(df) <- v
     df[[1]] <- NULL
-    return(df)
+    df
   }
   
-  input_cat <- get_input_category(dt_obj)
-  if (input_cat == 'dt') { return(dt_to_df(dt_obj)) }
-  else if (input_cat == 'dt_lst') { return(lapply(dt_obj, dt_to_df)) }
-  return(lapply(dt_obj, function(sub) { lapply(sub, dt_to_df) }))
+  skipped <- character(0)
+  
+  # Recursive walker (lists assumed fully named)
+  walk <- function(obj, path = "") {
+    if (is_dt(obj))    return(dt_to_df(obj))
+    if (is_spmat(obj)) { skipped <<- c(skipped, path); return(obj) }
+    if (is.list(obj)) {
+      nms <- names(obj)
+      return(setNames(lapply(nms, function(nm) {
+        walk(obj[[nm]], paste0(path, "$", nm))
+      }), nms))
+    }
+    stop(sprintf("convert_to_df(): Unsupported type at %s.", if (nzchar(path)) path else "<root>"))
+  }
+  root <- tryCatch(deparse(substitute(dt_obj)), error = function(...) "dt_obj")
+  result <- walk(dt_obj, root)
+  
+  if (length(skipped)) {
+    warning("convert_to_df(): Skipped converting sparse counts at: ",
+            paste(sort(unique(skipped)), collapse = ", "),
+            call. = FALSE)
+  }
+  result
 }
-
-
 

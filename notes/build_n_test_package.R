@@ -17,6 +17,11 @@ load_all(".")  # Alt. use ⇧ + ⌘ + L OR Build tab | More | Load All
 # Alt. 2 (if project setting has no effect) use:
 # Build tab | More | Document
 
+View(loaded$events$`KTH-2013-Baltic-16S`)
+View(loaded$asvs$`KTH-2013-Baltic-16S`)
+View(loaded$emof$`KTH-2013-Baltic-16S`)
+View(as.matrix(loaded$counts[[1]][1:100,]))
+
 # View help files
 ?asvoccur
 ?asvoccur::load_data

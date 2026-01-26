@@ -1,13 +1,14 @@
 Package: asvoccur
 Type: Package
 Title: Tools for ASV occurrence data in SBDI
-Version: 0.1.0
+Version: 1.0.0
 Author: The SBDI Molecular Data Team
 Description: This package provides functions for handling ASV occurrence data in SBDI.
 Imports:
     data.table,
+    Matrix,
     stats
-RoxygenNote: 7.3.2
+RoxygenNote: 7.3.3
 Encoding: UTF-8
 Maintainer: Maria Prager <maria.prager@scilifelab.se>
 License: MIT + file LICENSE

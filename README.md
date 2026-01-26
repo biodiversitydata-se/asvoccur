@@ -9,18 +9,17 @@ The **asvoccur** R package, currently under development, provides tools for unpa
 
 ## Install
 ```R
-install.packages('devtools')
-library(devtools)
-install_github("biodiversitydata-se/asvoccur")
+install.packages('remotes')
+remotes::install_github("biodiversitydata-se/asvoccur")
 # or:
-# install_github("biodiversitydata-se/asvoccur@develop")
+# remotes::install_github("biodiversitydata-se/asvoccur@develop")
 library(asvoccur)
 ```
-GitHub installations (local builds) may occasionally fail. If so:
+GitHub installations (local source builds) may occasionally fail. If so:
 ```R
 remove.packages("asvoccur")
 # restart R / RStudio
-install_github("biodiversitydata-se/asvoccur@develop", force = TRUE)
+remotes::install_github("biodiversitydata-se/asvoccur@develop", force = TRUE)
 ```
 
 ## Run

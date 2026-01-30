@@ -26,7 +26,7 @@ Merge data from different datasets previously loaded with
 Takes the output from \code{\link[=load_data]{load_data()}} and merges data from
 different ASV occurrence datasets into four sparse matrix or data table objects:
 
-\enumerate{
+\itemize{
 
   \item \strong{counts}: Read counts in a \code{taxonID} [row] x 
      \code{eventID} [col] sparse matrix.

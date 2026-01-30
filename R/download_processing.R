@@ -187,10 +187,10 @@ get_input_category <- function(input) {
 check_input_category <- function(input, lowest_cat) {
   actual_cat <- get_input_category(input)
   errors <- list(
-    dt = "Input must be a data table or a (possibly hierachical) list of data tables and matrice",
-    sp_mat = "Input must be a sparse matrix or a (possibly hierachical) list of data tables and matrice",
-    dt_lst = "Input must be a (possibly hierachical) list of data tables and matrice",
-    p_lst = "Input must be a hierarchical list of data tables and matrice"
+    dt = "Input must be a data table or a (possibly hierachical) list of data tables and matrices",
+    sp_mat = "Input must be a sparse matrix or a (possibly hierachical) list of data tables and matrices",
+    dt_lst = "Input must be a (possibly hierachical) list of data tables and matrices",
+    p_lst = "Input must be a hierarchical list of data tables and matrices"
   )
   if (lowest_cat == "dt") {
     if (actual_cat %in% c("dt", "dt_lst", "p_lst")) {

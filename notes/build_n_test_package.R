@@ -27,12 +27,18 @@ View(as.matrix(loaded$counts[[1]][1:100,]))
 ?asvoccur::load_data
 ?asvoccur::merge_data
 ?asvoccur::sum_by_clade
+?asvoccur::convert_to_df
 
 # Test functions
-data_path <- '~/Downloads'
+data_path <- '~/Downloads/16S/'
 loaded <- load_data(data_path)
+loaded_df <- convert_to_df(loaded)
+loaded_df <- convert_to_df(loaded, convert_counts = TRUE, max_cells = 1e8)
+rm(loaded_df)
+gc()
 View(loaded$asvs[[1]])
 merged <- merge_data(loaded)
 View(merged$asvs)
-clade_sums <- sum_by_clade(merged$counts, merged$asvs)
-View(clade_sums$norm$class)
+summed <- sum_by_clade(merged$counts, merged$asvs)
+View(summed$norm$class)
+summed_df <- convert_to_df(summed)

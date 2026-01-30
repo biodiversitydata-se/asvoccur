@@ -463,67 +463,138 @@ sum_by_clade <- function(counts, asvs) {
   return(list(raw = clade_sums_raw, norm = clade_sums_norm))
 }
 
-#' Convert data table(s) to data frame(s) with rownames
+#' Convert tabular ASV data to data.frame format
 #'
-#' Convert data table(s) into data frame(s), also transforming the first 
-#' (assumed ID) field into row names. Can be used to e.g. convert a single 
-#' \code{\link[=sum_by_clade]{summed}} data table, or all data table elements in
-#' \code{\link[=load_data]{loaded}} or \code{\link[=merge_data]{merged}} lists.
+#' Convert \code{data.table} objects to \code{data.frame} format for inspection
+#' and compatibility with functions expecting base R data frames. Can be applied
+#' to a single object or to the (possibly hierarchical) lists returned by
+#' \code{\link[=load_data]{load_data()}} or
+#' \code{\link[=merge_data]{merge_data()}}. Optionally attempts to convert sparse
+#' count matrices.
 #'
-#' @param dt_obj A data table or (possibly hierarchical) list of data tables
-#' where each dt has a unique ID in its first column.
-#' @return A corresponding data frame or (possibly list of) list(s) of data
-#' frames, in which the unique ID column has been transformed into row names.
-#' @usage convert_to_df(dt_obj)
-#' @details Converts data table(s) into data frame(s), also transforming the
-#' first (assumed ID) field into row names. ASVs that lack an ID, i.e. a name
-#' at some taxonomic rank, will be grouped into a row named 'Unnamed-clades' at
-#' that level.
+#' @param dt_obj A \code{data.table}, a \code{data.frame}, a sparse matrix (e.g.
+#'   \code{dgCMatrix}), or a (possibly hierarchical) list containing these.
+#' @param convert_counts Logical. If \code{TRUE}, attempts to convert sparse count
+#'   matrices to \code{data.frame}. If \code{FALSE} (default), sparse matrices are
+#'   left unchanged.
+#' @param max_cells Maximum allowed number of cells (\code{nrow * ncol}) when
+#'   converting a sparse matrix to a dense \code{data.frame}. If exceeded,
+#'   conversion is skipped and a warning is issued.
+#'
+#' @return A \code{data.frame} or a (possibly hierarchical) list of
+#'   \code{data.frame}s, with any sparse matrices that were not converted returned
+#'   unchanged.
+#'
+#' @usage convert_to_df(dt_obj, convert_counts = FALSE, max_cells = 5e6)
+#'
+#' @details Converts \code{data.table} objects to \code{data.frame} and moves the
+#' first column (assumed to be a unique ID) to row names. Missing IDs are replaced
+#' with \code{"Unnamed-clades"}.
+#'
+#' If \code{convert_counts = TRUE}, sparse matrices are converted only when their
+#' size does not exceed \code{max_cells}. Otherwise, they are left unchanged to
+#' avoid excessive memory use.
+#'
+#' \strong{Memory note:} Converting sparse count matrices to dense
+#' \code{data.frame}s can require large amounts of RAM. Only enable
+#' \code{convert_counts} for small datasets, or when the resulting object size is
+#' known to be manageable.
 #'
 #' Example usage:
 #' \describe{
 #'   \item{\code{loaded <- load_data(data_path = './datasets')}}{}
 #'   \item{\code{merged <- merge_data(loaded)}}{}
 #'   \item{\code{merged_df <- convert_to_df(merged)}}{}
+#'   \item{\code{# Attempt counts conversion (may be skipped if too large):}}{}
+#'   \item{\code{merged_df2 <- convert_to_df(merged, convert_counts = TRUE, max_cells = 1e8)}}{}
 #' }
+#'
 #' @export
-# Convert data.tables to data.frames (first column -> rownames).
-# Leave sparse matrices (counts) untouched and warn once listing where they were skipped.
-convert_to_df <- function(dt_obj) {
-  is_dt    <- function(z) inherits(z, "data.table")
-  is_spmat <- function(z) inherits(z, "sparseMatrix") || inherits(z, "Matrix")
+convert_to_df <- function(dt_obj, convert_counts = FALSE, max_cells = 5e6) {
+  is_dt <- function(z) inherits(z, "data.table")
+  is_df <- function(z) inherits(z, "data.frame") && !inherits(z, "data.table")
+  is_spmat <- function(z) {
+    inherits(z, "dgCMatrix") || inherits(z, "sparseMatrix") || inherits(z, "Matrix")
+  }
   
-  # data.table -> data.frame with first column as rownames
   dt_to_df <- function(dt) {
     df <- as.data.frame(dt)
-    v <- df[[1]]; v[is.na(v)] <- "Unnamed-clades"
-    rownames(df) <- v
+    id <- df[[1]]
+    id[is.na(id)] <- "Unnamed-clades"
+    rownames(df) <- id
     df[[1]] <- NULL
     df
   }
   
   skipped <- character(0)
   
-  # Recursive walker (lists assumed fully named)
+  contains_convertible <- function(x) {
+    if (is_dt(x) || is_spmat(x)) return(TRUE)
+    if (is.list(x)) return(any(vapply(x, contains_convertible, logical(1))))
+    FALSE
+  }
+  
+  contains_only_df <- function(x) {
+    if (is_df(x)) return(TRUE)
+    if (is.list(x)) return(all(vapply(x, contains_only_df, logical(1))))
+    FALSE
+  }
+  
+  if (!contains_convertible(dt_obj) && contains_only_df(dt_obj)) {
+    message("convert_to_df(): Input appears already converted (data.frame); nothing to do.")
+    return(dt_obj)
+  }
+  
   walk <- function(obj, path = "") {
-    if (is_dt(obj))    return(dt_to_df(obj))
-    if (is_spmat(obj)) { skipped <<- c(skipped, path); return(obj) }
+    if (is_dt(obj)) return(dt_to_df(obj))
+    
+    if (is_spmat(obj)) {
+      if (!convert_counts) {
+        skipped <<- c(skipped, path)
+        return(obj)
+      }
+      n_cells <- as.numeric(nrow(obj)) * as.numeric(ncol(obj))
+      if (n_cells > max_cells) {
+        skipped <<- c(skipped, path)
+        return(obj)
+      }
+      df <- as.data.frame(as.matrix(obj))
+      rownames(df) <- rownames(obj)
+      return(df)
+    }
+    
+    if (is_df(obj)) return(obj)
+    
     if (is.list(obj)) {
       nms <- names(obj)
+      if (is.null(nms)) nms <- as.character(seq_along(obj))
       return(setNames(lapply(nms, function(nm) {
         walk(obj[[nm]], paste0(path, "$", nm))
       }), nms))
     }
-    stop(sprintf("convert_to_df(): Unsupported type at %s.", if (nzchar(path)) path else "<root>"))
+    
+    stop(
+      sprintf(
+        "convert_to_df(): Unsupported input type at %s (class: %s).",
+        if (nzchar(path)) path else "<root>",
+        paste(class(obj), collapse = ", ")
+      ),
+      call. = FALSE
+    )
   }
+  
   root <- tryCatch(deparse(substitute(dt_obj)), error = function(...) "dt_obj")
   result <- walk(dt_obj, root)
   
   if (length(skipped)) {
-    warning("convert_to_df(): Skipped converting sparse counts at: ",
-            paste(sort(unique(skipped)), collapse = ", "),
-            call. = FALSE)
+    warning(
+      "convert_to_df(): Skipped converting sparse counts at: ",
+      paste(sort(unique(skipped)), collapse = ", "),
+      ". Counts left as sparse matrices. Use convert_counts = TRUE with larger max_cells or use disk-backed tools.",
+      call. = FALSE
+    )
   }
+  
   result
 }
 

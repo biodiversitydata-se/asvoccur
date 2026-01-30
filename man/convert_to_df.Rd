@@ -2,34 +2,55 @@
 % Please edit documentation in R/download_processing.R
 \name{convert_to_df}
 \alias{convert_to_df}
-\title{Convert data table(s) to data frame(s) with rownames}
+\title{Convert tabular ASV data to data.frame format}
 \usage{
-convert_to_df(dt_obj)
+convert_to_df(dt_obj, convert_counts = FALSE, max_cells = 5e6)
 }
 \arguments{
-\item{dt_obj}{A data table or (possibly hierarchical) list of data tables
-where each dt has a unique ID in its first column.}
+\item{dt_obj}{A \code{data.table}, a \code{data.frame}, a sparse matrix (e.g.
+\code{dgCMatrix}), or a (possibly hierarchical) list containing these.}
+
+\item{convert_counts}{Logical. If \code{TRUE}, attempts to convert sparse count
+matrices to \code{data.frame}. If \code{FALSE} (default), sparse matrices are
+left unchanged.}
+
+\item{max_cells}{Maximum allowed number of cells (\code{nrow * ncol}) when
+converting a sparse matrix to a dense \code{data.frame}. If exceeded,
+conversion is skipped and a warning is issued.}
 }
 \value{
-A corresponding data frame or (possibly list of) list(s) of data
-frames, in which the unique ID column has been transformed into row names.
+A \code{data.frame} or a (possibly hierarchical) list of
+  \code{data.frame}s, with any sparse matrices that were not converted returned
+  unchanged.
 }
 \description{
-Convert data table(s) into data frame(s), also transforming the first 
-(assumed ID) field into row names. Can be used to e.g. convert a single 
-\code{\link[=sum_by_clade]{summed}} data table, or all data table elements in
-\code{\link[=load_data]{loaded}} or \code{\link[=merge_data]{merged}} lists.
+Convert \code{data.table} objects to \code{data.frame} format for inspection
+and compatibility with functions expecting base R data frames. Can be applied
+to a single object or to the (possibly hierarchical) lists returned by
+\code{\link[=load_data]{load_data()}} or
+\code{\link[=merge_data]{merge_data()}}. Optionally attempts to convert sparse
+count matrices.
 }
 \details{
-Converts data table(s) into data frame(s), also transforming the
-first (assumed ID) field into row names. ASVs that lack an ID, i.e. a name
-at some taxonomic rank, will be grouped into a row named 'Unnamed-clades' at
-that level.
+Converts \code{data.table} objects to \code{data.frame} and moves the
+first column (assumed to be a unique ID) to row names. Missing IDs are replaced
+with \code{"Unnamed-clades"}.
+
+If \code{convert_counts = TRUE}, sparse matrices are converted only when their
+size does not exceed \code{max_cells}. Otherwise, they are left unchanged to
+avoid excessive memory use.
+
+\strong{Memory note:} Converting sparse count matrices to dense
+\code{data.frame}s can require large amounts of RAM. Only enable
+\code{convert_counts} for small datasets, or when the resulting object size is
+known to be manageable.
 
 Example usage:
 \describe{
   \item{\code{loaded <- load_data(data_path = './datasets')}}{}
   \item{\code{merged <- merge_data(loaded)}}{}
   \item{\code{merged_df <- convert_to_df(merged)}}{}
+  \item{\code{# Attempt counts conversion (may be skipped if too large):}}{}
+  \item{\code{merged_df2 <- convert_to_df(merged, convert_counts = TRUE, max_cells = 1e8)}}{}
 }
 }

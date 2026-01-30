@@ -91,6 +91,8 @@ load_data <- function(data_path = './datasets') {
       dimnames = list(levels(occurrences$taxonID), levels(occurrences$eventID))
     )
     
+    rm(occurrences); gc()
+    
     return(counts)
   }
   

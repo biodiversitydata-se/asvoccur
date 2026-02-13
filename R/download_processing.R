@@ -1,85 +1,221 @@
 #' Load downloaded ASV occurrence data
 #'
 #' Load Amplicon Sequence Variant (ASV) occurrence data from 'Darwin
-#' Core (DwC)-like' archives downloaded from the Swedish ASP portal,
+#' Core (DwC)-like' archives downloaded from the Swedish ASV portal,
 #' \url{https://asv-portal.biodiversitydata.se/}.
-#' @param data_path Path of directory containing dataset (*.zip) files
-#' @return A list of four sublists (\code{counts}, \code{asvs}, \code{events},
-#'   \code{emof}) containing sparse matrix or data table elements from each 
-#'   dataset, indexed by \code{datasetID}.
-#' @usage load_data(data_path = './datasets');
-#' @details Reads data from one or more compressed archives. Returns a list of
-#'   sub lists, each of which contains sparse matrix or data table 
-#'   objects from each included dataset:
+#'
+#' @param data_path Path to a directory containing one or more datasets.
+#'   The recommended workflow is to provide the original, unmodified
+#'   \code{*.zip} archives as downloaded from the ASV portal.
+#'
+#' @return A list of five sublists (\code{counts}, \code{asvs}, \code{events},
+#'   \code{datasets}, \code{emof}) containing sparse matrices or data tables
+#'   from each dataset, indexed by \code{datasetID}.
+#'
+#' @usage load_data(data_path = "./datasets")
+#'
+#' @details
+#' The recommended workflow is to use the original ZIP archives downloaded
+#' from the ASV portal without modification. For compatibility (e.g. browsers that automatically unzip downloads),
+#' \code{load_data()} can also read already-unzipped dataset folders.
+#' ZIP archives containing a top-level folder and macOS metadata
+#' (\code{__MACOSX}, \code{._*}) are handled automatically.
+#'
+#' For each dataset, the function locates the dataset root by identifying
+#' \code{occurrence.tsv} and validating that the required TSV files are present
+#' in the same directory.
 #'
 #' \itemize{
-#'   \item \strong{counts}: List of sparse matrices representing read counts
-#'     (taxon [row] x event [col] sparse matrix) from each dataset.
-#'     \itemize{
-#'       \item \code{`first-datasetID`} (sparse matrix)
-#'       \item \code{`second-datasetID`} (sparse matrix)
-#'       \item ...
-#'     }
-#'
-#'   \item \strong{asvs}: List of data tables containing the DNA sequence and
-#'     taxonomic assignment of ASVs (taxon [row] x attribute [col]) from each dataset.
-#'
-#'     \itemize{
-#'       \item \code{`first-datasetID`} (data table)
-#'       \item \code{`second-datasetID`} (data table)
-#'       \item ...
-#'     }
-#'
-#'   \item \strong{events}: List of data tables representing basic event/sample
-#'     metadata (event [row] x parameter [col]) from each dataset.
-#'
-#'     \itemize{
-#'       \item \code{`first-datasetID`} (data table)
-#'       \item \code{`second-datasetID`} (data table)
-#'       \item ...
-#'     }
-#'
-#'   \item \strong{emof}: List of data tables representing additional contextual
-#'     parameter values (event [row] x measurementType [col]) from each dataset.
-#'     \itemize{
-#'       \item \code{`first-datasetID`} (data table)
-#'       \item \code{`second-datasetID`} (data table)
-#'       \item ...
-#'     }
+#'   \item \strong{counts}: Sparse matrices of read counts
+#'     (taxon [row] x event [col]).
+#'   \item \strong{asvs}: Data tables containing ASV sequences and
+#'     taxonomic assignments.
+#'   \item \strong{events}: Data tables with event/sample metadata.
+#'   \item \strong{datasets}: Data tables with dataset-level metadata.
+#'   \item \strong{emof}: Data tables with contextual measurement values.
 #' }
 #'
-#' To inspect individual matrices or data tables:
+#' To inspect individual objects:
 #' \describe{
-#'   \item{\code{loaded <- load_data(data_path = './datasets')}}{}
-#'   \item{\code{View(loaded$emof$`first-datasetID`)}}{}
-#'   \item{\code{# OR (to show first 100 ASVs in first counts matrix):}}{}
-#'   \item{\strong{Memory note:} `counts` is a sparse matrix; converting large
-#'     matrices to dense format (e.g. `as.matrix()`) may exhaust RAM. Only convert
-#'     small subsets for inspection.}{}
-#'   \item{\code{View(as.matrix(loaded$counts[[1]][1:100,]))}}{}
+#'   \item{\code{loaded <- load_data(data_path = "./datasets")}}{}
+#'   \item{\code{View(loaded$emof[[1]])}}{}
+#'   \item{\strong{Memory note:} \code{counts} is a sparse matrix; converting
+#'     large matrices to dense format (e.g. \code{as.matrix()}) may exhaust RAM.
+#'     Only convert small subsets for inspection.}{}
+#'   \item{\code{View(as.matrix(loaded$counts[[1]][1:100, ]))}}{}
 #' }
 #' @export
-load_data <- function(data_path = './datasets') {
+load_data <- function(data_path = "./datasets") {
   
-  # Locate datasets
   if (!dir.exists(data_path)) {
     stop(paste("Path of dataset directory:", data_path, "was not found."))
   }
-  zip_files <- list.files(data_path, pattern = "\\.zip$", full.names = TRUE)
-  if (length(zip_files) == 0) {
-    stop(paste("No ZIP files found in", data_path, "."))
-  }
-  ds_ids <- gsub(".zip", "", basename(zip_files))
-  # Detect e.g. '<datasetID> copy.zip' or '<datasetID> (1).zip'
-  for (id in ds_ids)
-    if (!grepl("^[A-Za-z0-9_\\-]+$", id))
-      stop(paste("Invalid filename detected:", paste0("'",id,".zip'\n"),
-                 "Please resolve before proceeding."))
   
-  # Reads & reshapes occurrence.tsv into sparse (!) and wide (taxonID x eventID) format
-  get_counts <- function(zip) {
-    occurrences <- fread(utils::unzip(zip, files = "occurrence.tsv", 
-                                      exdir = tempdir()))
+  # ---------- Helpers ----------
+  # Robust root detection: find the folder that contains occurrence.tsv + required TSVs.
+  # Works for:
+  # - flat datasets
+  # - datasets inside one or more nested folders
+  # - ZIPs re-packed on macOS (ignores __MACOSX and ._ files)
+  find_dataset_root <- function(dir_path) {
+    
+    occ <- list.files(
+      dir_path,
+      pattern = "^occurrence\\.tsv$",
+      recursive = TRUE,
+      full.names = TRUE
+    )
+    
+    # Ignore macOS metadata artifacts
+    occ <- occ[!grepl("(^|/)__MACOSX(/|$)", occ)]
+    occ <- occ[!grepl("(^|/)\\._", occ)]
+    
+    if (length(occ) == 0) {
+      stop("No occurrence.tsv found under: ", dir_path)
+    }
+    if (length(occ) > 1) {
+      stop(
+        "Multiple occurrence.tsv files found under: ", dir_path,
+        "\nCannot determine unique dataset root."
+      )
+    }
+    
+    root <- dirname(occ)
+    
+    required <- c("asv.tsv", "event.tsv", "emof.tsv")
+    missing <- required[!file.exists(file.path(root, required))]
+    if (length(missing) > 0) {
+      stop(
+        "Dataset root found at ", root,
+        " but missing required files: ",
+        paste(missing, collapse = ", ")
+      )
+    }
+    
+    normalizePath(root, winslash = "/", mustWork = TRUE)
+  }
+  
+  # Resolve source to a root directory containing TSVs.
+  # If zip -> unzip once into a unique temp dir, then find root. If dir -> find root.
+  # IMPORTANT: do NOT clean up temp dirs here; we clean up later in the outer on.exit().
+  resolve_root <- function(source_path) {
+    if (grepl("\\.zip$", source_path, ignore.case = TRUE)) {
+      td <- tempfile("asv_zip_")
+      dir.create(td, showWarnings = FALSE, recursive = TRUE)
+      
+      utils::unzip(source_path, exdir = td)
+      
+      root <- find_dataset_root(td)
+      attr(root, "cleanup_dir") <- td
+      return(root)
+    }
+    
+    if (dir.exists(source_path)) {
+      root <- find_dataset_root(source_path)
+      attr(root, "cleanup_dir") <- NULL
+      return(root)
+    }
+    
+    stop("Source is neither a ZIP nor a directory: ", source_path)
+  }
+  
+  # Read a TSV from root_dir
+  read_tsv <- function(root_dir, filename, ...) {
+    path <- file.path(root_dir, filename)
+    if (!file.exists(path)) {
+      stop("Missing file '", filename, "' in dataset root: ", root_dir)
+    }
+    data.table::fread(
+      path,
+      sep = "\t",
+      quote = "",
+      encoding = "UTF-8",
+      showProgress = FALSE,
+      ...
+    )
+  }
+  
+  # Build dataset id
+  make_id <- function(source_path, root_dir) {
+    if (grepl("\\.zip$", source_path, ignore.case = TRUE)) {
+      return(gsub("\\.zip$", "", basename(source_path), ignore.case = TRUE))
+    }
+    basename(root_dir)
+  }
+  
+  validate_ids <- function(ids) {
+    bad <- ids[!grepl("^[A-Za-z0-9_\\-]+$", ids)]
+    if (length(bad) > 0) {
+      stop(
+        "Invalid dataset id(s) detected: ",
+        paste0("'", bad, "'", collapse = ", "),
+        "\nPlease rename ZIP(s)/folder(s) to only use [A-Za-z0-9_-]."
+      )
+    }
+  }
+  
+  # ---------- Discover sources (ZIPs + dataset directories) ----------
+  zip_sources <- list.files(data_path, pattern = "\\.zip$", full.names = TRUE)
+  
+  dir_sources <- list.dirs(data_path, recursive = FALSE, full.names = TRUE)
+  dir_sources <- dir_sources[dir_sources != data_path]
+  
+  # Keep only directories that contain occurrence.tsv somewhere underneath (quick filter)
+  dir_sources <- dir_sources[
+    vapply(dir_sources, function(d) {
+      any(grepl(
+        "occurrence\\.tsv$",
+        list.files(d, pattern = "^occurrence\\.tsv$", recursive = TRUE, full.names = TRUE)
+      ))
+    }, logical(1))
+  ]
+  
+  # ---- De-duplicate: prefer ZIP archives over unzipped folders with same datasetID ----
+  zip_ids <- gsub("\\.zip$", "", basename(zip_sources), ignore.case = TRUE)
+  dir_ids <- basename(dir_sources)
+  duplicate_ids <- intersect(zip_ids, dir_ids)
+  
+  if (length(duplicate_ids) > 0) {
+    message(
+      "Both ZIP archive(s) and unzipped folder(s) found for dataset(s): ",
+      paste(duplicate_ids, collapse = ", "),
+      ". Using ZIP archive(s) and ignoring folder(s)."
+    )
+    dir_sources <- dir_sources[!(dir_ids %in% duplicate_ids)]
+    dir_ids <- basename(dir_sources) # refresh
+  }
+  
+  # ---- Warn if reading any unzipped dataset folders ----
+  if (length(dir_sources) > 0) {
+    warning(
+      "Reading unzipped dataset folder(s). Recommended workflow is to use ",
+      "the original ZIP archives downloaded from the ASV portal.",
+      call. = FALSE
+    )
+  }
+  
+  sources <- c(zip_sources, dir_sources)
+  if (length(sources) == 0) {
+    stop("No ZIP files or dataset directories found in ", data_path, ".")
+  }
+  
+  # ---------- Resolve sources -> root dirs (ZIPs are unzipped once) ----------
+  roots <- lapply(sources, resolve_root)
+  
+  # Clean up temp dirs created for ZIP sources AFTER everything is read
+  on.exit({
+    tds <- unique(Filter(Negate(is.null), lapply(roots, attr, which = "cleanup_dir")))
+    for (td in tds) {
+      if (dir.exists(td)) unlink(td, recursive = TRUE, force = TRUE)
+    }
+  }, add = TRUE)
+  
+  ds_ids <- mapply(make_id, sources, roots, USE.NAMES = FALSE)
+  validate_ids(ds_ids)
+  
+  # ---------- Readers operate on root_dir ----------
+  get_counts <- function(root_dir) {
+    occurrences <- read_tsv(root_dir, "occurrence.tsv")
     occurrences[, taxonID := as.factor(taxonID)]
     occurrences[, eventID := as.factor(eventID)]
     
@@ -92,76 +228,72 @@ load_data <- function(data_path = './datasets') {
     )
     
     rm(occurrences); gc()
-    
-    return(counts)
+    counts
   }
   
-  # Reads ASV sequence and taxonomy from asv.tsv
-  get_asvs <- function(zip) {
-    asvs <- fread(utils::unzip(zip, files = "asv.tsv", exdir = tempfile()))
-    asvs[, dataset_pid := NULL] # Col for admin use only
-    # Replace "" with NA in taxonomy
-    tax_cols <- c("kingdom", "phylum", "order", "class", "family", "genus",
-                  "specificEpithet", "infraspecificEpithet", "otu")       
+  get_asvs <- function(root_dir) {
+    asvs <- read_tsv(root_dir, "asv.tsv")
+    asvs[, dataset_pid := NULL]
+    
+    tax_cols <- c(
+      "kingdom", "phylum", "order", "class", "family", "genus",
+      "specificEpithet", "infraspecificEpithet", "otu"
+    )
+    
     asvs[, (tax_cols) := lapply(.SD, function(x) ifelse(x == "", NA, x)),
          .SDcols = tax_cols]
-    setkey(asvs, taxonID)
-    return(asvs)
+    
+    data.table::setkey(asvs, taxonID)
+    asvs
   }
   
-  # Reads and reshapes events.tsv
-  get_events <- function(zip) {
-    events <- fread(utils::unzip(zip, files = "event.tsv", exdir = tempfile()))
+  get_events <- function(root_dir) {
+    events <- read_tsv(root_dir, "event.tsv")
     events[, c("dataset_pid", "datasetName", "ipt_resource_id") := NULL]
-    setkey(events, eventID)
-    return(events)
+    data.table::setkey(events, eventID)
+    events
   }
   
-  get_datasets <- function(zip) {
+  get_datasets <- function(root_dir) {
     ds_cols <- c("eventID", "datasetName")
-    datasets <- fread(utils::unzip(zip, files = "event.tsv", 
-                                   exdir = tempfile()), select = ds_cols)
-    datasets[, datasetID := strsplit(eventID, ":")[[1]][1]]
+    datasets <- read_tsv(root_dir, "event.tsv", select = ds_cols)
+    
+    datasets[, datasetID := vapply(strsplit(eventID, ":"), `[`, character(1), 1)]
     datasets[, eventID := NULL]
-    setcolorder(datasets, c("datasetID", "datasetName"))
-    datasets <- unique(datasets)
-    return(datasets)
+    
+    data.table::setcolorder(datasets, c("datasetID", "datasetName"))
+    unique(datasets)
   }
   
-  # Reads & reshapes emof.tsv
-  # [eventID x measurementType (measurementUnit)]
-  # and drops remaining fields, e.g.measurementMethod & measurementRemarks!
-  get_emof <- function(zip) {
-    emof <- fread(utils::unzip(zip, files = "emof.tsv", exdir = tempfile()))
-    event_ids <- fread(utils::unzip(zip, files = 'event.tsv', exdir = tempfile()), 
-                       select = "eventID")
-
-    # Handle datasets that have no contextual data
-    if (nrow(emof) == 0) { warning("load_data(): Adding empty emof table for ", 
-                                   gsub("\\.zip$", "", basename(zip)),
-                                   call. = FALSE)
-      emof <- data.table(eventID = event_ids$eventID)
+  get_emof <- function(root_dir) {
+    emof <- read_tsv(root_dir, "emof.tsv")
+    event_ids <- read_tsv(root_dir, "event.tsv", select = "eventID")
+    
+    if (nrow(emof) == 0) {
+      warning("load_data(): Adding empty emof table for ", basename(root_dir), call. = FALSE)
+      emof <- data.table::data.table(eventID = event_ids$eventID)
     } else {
-      emof <- dcast(emof, 
-                    eventID ~ paste0(measurementType, " (", measurementUnit, ")"), 
-                    value.var = "measurementValue")
-      # Include events without data, if any
+      emof <- data.table::dcast(
+        emof,
+        eventID ~ paste0(measurementType, " (", measurementUnit, ")"),
+        value.var = "measurementValue"
+      )
       emof <- merge(event_ids, emof, by = "eventID", all.x = TRUE)
     }
-    setkey(emof, eventID)
-    return(emof)
+    
+    data.table::setkey(emof, eventID)
+    emof
   }
   
-  # Process data into data tables in (sub)lists, and return in parent list
   loaded <- list()
-  loaded$counts <- setNames(lapply(zip_files, get_counts), ds_ids)
-  loaded$asvs <- setNames(lapply(zip_files, get_asvs), ds_ids)
-  loaded$events <- setNames(lapply(zip_files, get_events), ds_ids)
-  loaded$datasets <- setNames(lapply(zip_files, get_datasets), ds_ids)
-  loaded$emof <- setNames(lapply(zip_files, get_emof), ds_ids)
-  return(loaded)
+  loaded$counts   <- stats::setNames(lapply(roots, get_counts), ds_ids)
+  loaded$asvs     <- stats::setNames(lapply(roots, get_asvs), ds_ids)
+  loaded$events   <- stats::setNames(lapply(roots, get_events), ds_ids)
+  loaded$datasets <- stats::setNames(lapply(roots, get_datasets), ds_ids)
+  loaded$emof     <- stats::setNames(lapply(roots, get_emof), ds_ids)
+  
+  loaded
 }
-
 
 # Internal functions to check that input to downstream functions is
 # data table- or matrix-based, and matches the level of complexity accepted by 

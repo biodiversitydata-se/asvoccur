@@ -654,11 +654,11 @@ sum_by_clade <- function(counts, asvs, convert_to_dt = FALSE, max_cells = 5e6) {
 #' to a single object or to the (possibly hierarchical) lists returned by
 #' \code{\link[=load_data]{load_data()}} or
 #' \code{\link[=merge_data]{merge_data()}}. Optionally attempts to convert sparse
-#' count matrices.
+#' matrices (typically count matrices).
 #'
 #' @param dt_obj A \code{data.table}, a \code{data.frame}, a sparse matrix (e.g.
 #'   \code{dgCMatrix}), or a (possibly hierarchical) list containing these.
-#' @param convert_counts Logical. If \code{TRUE}, attempts to convert sparse count
+#' @param convert_counts Logical. If \code{TRUE}, attempts to convert sparse
 #'   matrices to \code{data.frame}. If \code{FALSE} (default), sparse matrices are
 #'   left unchanged.
 #' @param max_cells Maximum allowed number of cells (\code{nrow * ncol}) when
@@ -679,14 +679,14 @@ sum_by_clade <- function(counts, asvs, convert_to_dt = FALSE, max_cells = 5e6) {
 #' size does not exceed \code{max_cells}. Otherwise, they are left unchanged to
 #' avoid excessive memory use.
 #'
-#' \strong{Memory note:} Converting sparse count matrices to dense
+#' \strong{Memory note:} Converting sparse matrices to dense
 #' \code{data.frame}s can require large amounts of RAM. Only enable
 #' \code{convert_counts} for small datasets, or when the resulting object size is
 #' known to be manageable.
 #'
 #' Example usage:
 #' \describe{
-#'   \item{\code{loaded <- load_data(data_path = './datasets')}}{}
+#'   \item{\code{loaded <- load_data(data_path = "./datasets")}}{}
 #'   \item{\code{merged <- merge_data(loaded)}}{}
 #'   \item{\code{merged_df <- convert_to_df(merged)}}{}
 #'   \item{\code{# Attempt counts conversion (may be skipped if too large):}}{}
@@ -711,6 +711,7 @@ convert_to_df <- function(dt_obj, convert_counts = FALSE, max_cells = 5e6) {
   }
   
   skipped <- character(0)
+  dense_warning_issued <- FALSE
   
   contains_convertible <- function(x) {
     if (is_dt(x) || is_spmat(x)) return(TRUE)
@@ -742,7 +743,18 @@ convert_to_df <- function(dt_obj, convert_counts = FALSE, max_cells = 5e6) {
         skipped <<- c(skipped, path)
         return(obj)
       }
-      df <- as.data.frame(as.matrix(obj))
+      
+      if (!dense_warning_issued) {
+        warning(
+          "convert_to_df(): Converting sparse matrices to dense data.frame. ",
+          "This may require substantial RAM for large datasets.",
+          call. = FALSE
+        )
+        dense_warning_issued <<- TRUE
+      }
+      
+      dense_mat <- suppressWarnings(as.matrix(obj))
+      df <- as.data.frame(dense_mat)
       rownames(df) <- rownames(obj)
       return(df)
     }
@@ -781,4 +793,3 @@ convert_to_df <- function(dt_obj, convert_counts = FALSE, max_cells = 5e6) {
   
   result
 }
-

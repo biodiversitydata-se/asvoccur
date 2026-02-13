@@ -508,93 +508,143 @@ merge_data <- function(loaded, ds = NULL) {
 #' ranks, for each sample in a \code{\link[=load_data]{loaded}} or
 #' \code{\link[=merge_data]{merged}} ASV occurrence dataset.
 #'
-#' @param counts ASV read counts in a taxon [row] x event [col] sparse matrix, 
-#' from a \code{\link[=load_data]{loaded}} or
+#' @param counts ASV read counts in a taxon [row] x event [col] sparse matrix,
+#'   from a \code{\link[=load_data]{loaded}} or
 #'   \code{\link[=merge_data]{merged}} ASV occurrence dataset.
 #' @param asvs A data table containing the DNA sequences and taxonomic assignment
-#'   of ASV:s included in the \code{counts} matrix.
-#' @return A list containing two sub-lists: `raw` and `norm`, each including
-#'   data tables for summed ASV counts at each taxonomic rank.
-#' @usage sum_by_clade(counts, asvs)
-#' @details Sums raw and normalized read counts across ASVs within distinct
-#'   clades, at specified taxonomic ranks, to provide higher-level views of the
-#'   data. The function normalizes ASV read counts by total counts per sample,
-#'   and returns a list of two sub list, each of which contains data tables
-#'   of summed counts for each taxonomic rank:
+#'   of ASVs included in the \code{counts} matrix.
+#' @param convert_to_dt Logical. If \code{TRUE}, attempts to convert summed clade
+#'   matrices to wide \code{data.table}s (clade [row] x event [col]). If \code{FALSE}
+#'   (default), returns sparse matrices.
+#' @param max_cells Maximum allowed number of cells (\code{nrow * ncol}) when
+#'   converting a sparse matrix to a dense wide \code{data.table}. If exceeded,
+#'   conversion is skipped and the sparse matrix is returned instead (with a warning).
+#'
+#' @return A list containing two sub-lists, \code{raw} and \code{norm}. Each
+#'   sub-list contains one element per taxonomic rank. Elements are sparse matrices
+#'   by default, or wide \code{data.table}s if \code{convert_to_dt = TRUE} and the
+#'   size is within \code{max_cells}.
+#'
+#' @usage sum_by_clade(counts, asvs, convert_to_dt = FALSE, max_cells = 5e6)
+#'
+#' @details
+#' Sums raw and normalized read counts across ASVs within distinct clades at each
+#' taxonomic rank to provide higher-level views of the data. Normalization is
+#' performed per sample (column-wise) by total counts.
 #'
 #' \itemize{
-#'   \item \strong{raw}: List of data tables showing raw read counts summed by 
-#'   clade at different taxonomic ranks.
-#'     \itemize{
-#'       \item \code{kingdom} (data table)
-#'       \item ...
-#'       \item \code{species} (data table)
-#'     }
-#'     
-#'   \item \strong{norm}: List of data tables representing normalized read counts 
-#'   summed by clade at different taxonomic ranks.
-#'     \itemize{
-#'       \item \code{kingdom} (data table)
-#'       \item ...
-#'       \item \code{species} (data table)
-#'     }
+#'   \item \strong{raw}: Summed raw read counts by clade.
+#'   \item \strong{norm}: Summed normalized read counts by clade.
 #' }
-#' #' To view an individual table:
+#'
+#' \strong{Memory note:} Summed clade matrices can still be large (clades x samples).
+#' Converting to dense format (wide \code{data.table}) may require substantial RAM.
+#' Prefer sparse output, or inspect small subsets, e.g.
+#' \code{as.matrix(summed$raw$class[1:5, 1:5])}.
+#'
+#' To view an individual result:
 #' \describe{
-#'   \item{\code{loaded <- load_data(data_path = './datasets')}}{}
+#'   \item{\code{loaded <- load_data(data_path = "./datasets")}}{}
 #'   \item{\code{merged <- merge_data(loaded)}}{}
 #'   \item{\code{summed <- sum_by_clade(merged$counts, merged$asvs)}}{}
-#'   \item{\code{View(summed$raw$family)}}{}
+#'   \item{\code{as.matrix(summed$raw$family[1:5, 1:5])}}{}
+#'   \item{\code{summed_dt <- sum_by_clade(merged$counts, merged$asvs, convert_to_dt = TRUE)}}{}
+#'   \item{\code{View(summed_dt$raw$family)}}{}
 #' }
 #' @export
-sum_by_clade <- function(counts, asvs) {
+sum_by_clade <- function(counts, asvs, convert_to_dt = FALSE, max_cells = 5e6) {
   
-  check_input_category(counts, 'sp_mat')
-  check_input_category(asvs, 'dt')
+  check_input_category(counts, "sp_mat")
+  check_input_category(asvs, "dt")
   
   if (!identical(rownames(counts), asvs$taxonID)) {
-    stop("Mismatch detected: 
-         Row names of 'counts' do not match 'taxonID' of 'asvs'. 
-         Please ensure they are identical.")
+    stop(
+      "Mismatch detected:\n",
+      "Row names of 'counts' do not match 'taxonID' of 'asvs'.\n",
+      "Please ensure they are identical."
+    )
   }
   
-  tax_cols <- c('taxonID', 'kingdom', 'phylum', 'class', 'order', 'family', 
-                'genus', 'specificEpithet', 'otu')
+  tax_cols <- c("taxonID", "kingdom", "phylum", "class", "order", "family",
+                "genus", "specificEpithet", "otu")
   taxa <- asvs[, ..tax_cols]
-  taxa[, species := ifelse(is.na(specificEpithet), NA, 
+  taxa[, species := ifelse(is.na(specificEpithet), NA_character_,
                            paste(genus, specificEpithet))]
   taxa[, specificEpithet := NULL]
-  setcolorder(taxa, c(setdiff(names(taxa), 'otu'), 'otu'))
+  setcolorder(taxa, c(setdiff(names(taxa), "otu"), "otu"))
+  
+  skipped <- character(0)
+  
+  mat_to_dt_safe <- function(m, rank_label) {
+    n_cells <- as.numeric(nrow(m)) * as.numeric(ncol(m))
+    if (n_cells > max_cells) {
+      skipped <<- c(skipped, rank_label)
+      return(m)
+    }
+    
+    # Optional one-time note (only once per call)
+    if (!exists(".sum_by_clade_warned_dense", envir = parent.frame(), inherits = FALSE)) {
+      warning(
+        "sum_by_clade(): Converting sparse matrices to dense data.table. ",
+        "This may require substantial RAM for large datasets.",
+        call. = FALSE
+      )
+      assign(".sum_by_clade_warned_dense", TRUE, envir = parent.frame())
+    }
+    
+    data.table::data.table(clade = rownames(m), suppressWarnings(as.matrix(m)))
+  }
   
   clade_sums_raw <- list()
   clade_sums_norm <- list()
   
   for (rank in names(taxa)[-1]) {
-    clades <- ifelse(is.na(taxa[[rank]]), "Unclassified", taxa[[rank]])
+    clades <- ifelse(is.na(taxa[[rank]]), "Unclassified", as.character(taxa[[rank]]))
     
     clade_levels <- unique(clades)
     clade_index <- match(clades, clade_levels)
     
-    # Aggregate using matrix multiplication
-    G <- Matrix::sparseMatrix(i = clade_index, j = seq_along(clades), x = 1,
-                              dims = c(length(clade_levels), length(clades)))
+    # Aggregate using sparse matrix multiplication
+    G <- Matrix::sparseMatrix(
+      i = clade_index,
+      j = seq_along(clades),
+      x = 1,
+      dims = c(length(clade_levels), length(clades))
+    )
+    
     raw_matrix <- G %*% counts
     rownames(raw_matrix) <- clade_levels
     
-    # Normalise
-    norm_matrix <- raw_matrix %*% Matrix::Diagonal(x = 1 / Matrix::colSums(raw_matrix))
+    # Normalise (safe for zero-sum columns)
+    cs <- Matrix::colSums(raw_matrix)
+    inv_cs <- ifelse(cs == 0, 0, 1 / cs)
+    norm_matrix <- raw_matrix %*% Matrix::Diagonal(x = inv_cs)
     colnames(norm_matrix) <- colnames(raw_matrix)
-   
-     # Sort clades
+    
+    # Sort clades
     clade_order <- order(rownames(raw_matrix))
     raw_matrix <- raw_matrix[clade_order, , drop = FALSE]
     norm_matrix <- norm_matrix[clade_order, , drop = FALSE]
     
-    # Convert to dt:s
-    clade_sums_raw[[rank]] <- data.table(clade = rownames(raw_matrix), as.matrix(raw_matrix))
-    clade_sums_norm[[rank]] <- data.table(clade = rownames(norm_matrix), as.matrix(norm_matrix))
+    if (convert_to_dt) {
+      clade_sums_raw[[rank]]  <- mat_to_dt_safe(raw_matrix,  paste0("raw$", rank))
+      clade_sums_norm[[rank]] <- mat_to_dt_safe(norm_matrix, paste0("norm$", rank))
+    } else {
+      clade_sums_raw[[rank]]  <- raw_matrix
+      clade_sums_norm[[rank]] <- norm_matrix
+    }
   }
-  return(list(raw = clade_sums_raw, norm = clade_sums_norm))
+  
+  if (convert_to_dt && length(skipped)) {
+    warning(
+      "sum_by_clade(): Skipped converting large sparse matrices at: ",
+      paste(sort(unique(skipped)), collapse = ", "),
+      ". Returned these as sparse matrices. Increase max_cells to force conversion.",
+      call. = FALSE
+    )
+  }
+  
+  list(raw = clade_sums_raw, norm = clade_sums_norm)
 }
 
 #' Convert tabular ASV data to data.frame format

@@ -12,6 +12,9 @@ R tools for ASV occurrence data in [SBDI](https://biodiversitydata.se/).
 ## Overview
 The **asvoccur** R package, currently under development, provides tools for unpacking and processing ASV occurrence data and metadata downloaded from [the Swedish ASV portal](http://asv-portal.biodiversitydata.se/). It enables users to convert condensed DwC archives into ASV table format for easier downstream analysis in R, by using functions that load, merge, and aggregate ASV counts across taxonomic ranks.
 
+## Tutorial
+See our [tutorial](https://biodiversitydata-se.github.io/sbdi-days-eDNA/tutorial.html) for an example workflow using **asvoccur** with ASV portal data in R.
+
 ## Install
 ```R
 install.packages('remotes')

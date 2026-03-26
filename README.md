@@ -2,6 +2,10 @@
 R tools for ASV occurrence data in [SBDI](https://biodiversitydata.se/).
 
 ## News
+- **March 2026**: Improved handling of ZIP archives and dataset loading. If you encounter issues, consider installing the development branch where these improvements are currently available (beta).
+
+- **February 2026**: Added optional conversion of sparse count matrices to `data.frame` via `convert_to_df()`, with a size threshold to avoid excessive memory use. Enables compatibility with downstream tools that do not support sparse formats.
+
 - **March 2025**: Switched counts table to sparse matrices to handle large datasets from the Insect Biome Atlas project, as previous implementation using `data.table` caused RAM exhaustion. Sparse matrices are currently applied only to counts, but further use for other objects (asvs, events, emof) may follow.
 
 ## Overview

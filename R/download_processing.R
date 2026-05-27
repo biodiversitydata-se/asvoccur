@@ -135,12 +135,15 @@ load_data <- function(data_path = "./datasets") {
     )
   }
   
-  # Build dataset id
+  # Build dataset id from the source path (ZIP or directory) as supplied by the
+  # user, not from root_dir. root_dir may point to a nested subfolder inside the
+  # source when a ZIP or directory contains a top-level wrapper folder, which
+  # would produce the wrong id.
   make_id <- function(source_path, root_dir) {
     if (grepl("\\.zip$", source_path, ignore.case = TRUE)) {
       return(gsub("\\.zip$", "", basename(source_path), ignore.case = TRUE))
     }
-    basename(root_dir)
+    basename(source_path)
   }
   
   validate_ids <- function(ids) {
@@ -163,10 +166,7 @@ load_data <- function(data_path = "./datasets") {
   # Keep only directories that contain occurrence.tsv somewhere underneath (quick filter)
   dir_sources <- dir_sources[
     vapply(dir_sources, function(d) {
-      any(grepl(
-        "occurrence\\.tsv$",
-        list.files(d, pattern = "^occurrence\\.tsv$", recursive = TRUE, full.names = TRUE)
-      ))
+      length(list.files(d, pattern = "^occurrence\\.tsv$", recursive = TRUE)) > 0
     }, logical(1))
   ]
   

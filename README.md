@@ -1,14 +1,7 @@
 # asvoccur
 R tools for ASV occurrence data in [SBDI](https://biodiversitydata.se/).
 
-## News
-- **August 2026**: Fixed a bug in `merge_data()` where numeric columns in `events`, `emof` and `datasets` (e.g. `decimalLatitude`, `biomass`) were incorrectly returned as character whenever any sample had a missing value for that column, due to a type-coercion quirk in the internal `restore_numeric()` helper.
-
-- **March 2026**: Improved handling of ZIP archives and dataset loading. If you encounter issues, consider installing the development branch where these improvements are currently available (beta).
-
-- **February 2026**: Added optional conversion of sparse count matrices to `data.frame` via `convert_to_df()`, with a size threshold to avoid excessive memory use. Enables compatibility with downstream tools that do not support sparse formats.
-
-- **March 2025**: Switched counts table to sparse matrices to handle large datasets from the Insect Biome Atlas project, as previous implementation using `data.table` caused RAM exhaustion. Sparse matrices are currently applied only to counts, but further use for other objects (asvs, events, emof) may follow.
+See [Releases](https://github.com/biodiversitydata-se/asvoccur/releases) for the changelog.
 
 ## Overview
 The **asvoccur** R package, currently under development, provides tools for unpacking and processing ASV occurrence data and metadata downloaded from [the Swedish ASV portal](http://asv-portal.biodiversitydata.se/). It enables users to convert condensed DwC archives into ASV table format for easier downstream analysis in R, by using functions that load, merge, and aggregate ASV counts across taxonomic ranks.

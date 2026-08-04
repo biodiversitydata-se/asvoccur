@@ -2,6 +2,8 @@
 R tools for ASV occurrence data in [SBDI](https://biodiversitydata.se/).
 
 ## News
+- **August 2026**: Fixed a bug in `merge_data()` where numeric columns in `events`, `emof` and `datasets` (e.g. `decimalLatitude`, `biomass`) were incorrectly returned as character whenever any sample had a missing value for that column, due to a type-coercion quirk in the internal `restore_numeric()` helper.
+
 - **March 2026**: Improved handling of ZIP archives and dataset loading. If you encounter issues, consider installing the development branch where these improvements are currently available (beta).
 
 - **February 2026**: Added optional conversion of sparse count matrices to `data.frame` via `convert_to_df()`, with a size threshold to avoid excessive memory use. Enables compatibility with downstream tools that do not support sparse formats.

@@ -310,8 +310,13 @@ merge_data <- function(loaded, ds = NULL) {
   # Reapplies numeric data type to cols (after merging as char)
   restore_numeric <- function(dt){
     dt[, names(dt) := lapply(.SD, function(col) {
+      if (!is.character(col)) return(col)
       num_value <- suppressWarnings(as.numeric(col))
-      ifelse(is.na(num_value), col, num_value)
+      # Only convert if every non-missing value parsed cleanly - i.e. the
+      # column is genuinely numeric with some NAs, not text. ifelse() would
+      # otherwise coerce the whole column back to character as soon as any
+      # single value (even a pre-existing NA) took the "col" branch.
+      if (all(is.na(num_value) == is.na(col))) num_value else col
     })]
   }
   

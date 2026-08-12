@@ -1,85 +1,221 @@
 #' Load downloaded ASV occurrence data
 #'
 #' Load Amplicon Sequence Variant (ASV) occurrence data from 'Darwin
-#' Core (DwC)-like' archives downloaded from the Swedish ASP portal,
+#' Core (DwC)-like' archives downloaded from the Swedish ASV portal,
 #' \url{https://asv-portal.biodiversitydata.se/}.
-#' @param data_path Path of directory containing dataset (*.zip) files
-#' @return A list of four sublists (\code{counts}, \code{asvs}, \code{events},
-#'   \code{emof}) containing sparse matrix or data table elements from each 
-#'   dataset, indexed by \code{datasetID}.
-#' @usage load_data(data_path = './datasets');
-#' @details Reads data from one or more compressed archives. Returns a list of
-#'   sub lists, each of which contains sparse matrix or data table 
-#'   objects from each included dataset:
+#'
+#' @param data_path Path to a directory containing one or more datasets.
+#'   The recommended workflow is to provide the original, unmodified
+#'   \code{*.zip} archives as downloaded from the ASV portal.
+#'
+#' @return A list of five sublists (\code{counts}, \code{asvs}, \code{events},
+#'   \code{datasets}, \code{emof}) containing sparse matrices or data tables
+#'   from each dataset, indexed by \code{datasetID}.
+#'
+#' @usage load_data(data_path = "./datasets")
+#'
+#' @details
+#' The recommended workflow is to use the original ZIP archives downloaded
+#' from the ASV portal without modification. For compatibility (e.g. browsers that automatically unzip downloads),
+#' \code{load_data()} can also read already-unzipped dataset folders.
+#' ZIP archives containing a top-level folder and macOS metadata
+#' (\code{__MACOSX}, \code{._*}) are handled automatically.
+#'
+#' For each dataset, the function locates the dataset root by identifying
+#' \code{occurrence.tsv} and validating that the required TSV files are present
+#' in the same directory.
 #'
 #' \itemize{
-#'   \item \strong{counts}: List of sparse matrices representing read counts
-#'     (taxon [row] x event [col] sparse matrix) from each dataset.
-#'     \itemize{
-#'       \item \code{`first-datasetID`} (sparse matrix)
-#'       \item \code{`second-datasetID`} (sparse matrix)
-#'       \item ...
-#'     }
-#'
-#'   \item \strong{asvs}: List of data tables containing the DNA sequence and
-#'     taxonomic assignment of ASVs (taxon [row] x attribute [col]) from each dataset.
-#'
-#'     \itemize{
-#'       \item \code{`first-datasetID`} (data table)
-#'       \item \code{`second-datasetID`} (data table)
-#'       \item ...
-#'     }
-#'
-#'   \item \strong{events}: List of data tables representing basic event/sample
-#'     metadata (event [row] x parameter [col]) from each dataset.
-#'
-#'     \itemize{
-#'       \item \code{`first-datasetID`} (data table)
-#'       \item \code{`second-datasetID`} (data table)
-#'       \item ...
-#'     }
-#'
-#'   \item \strong{emof}: List of data tables representing additional contextual
-#'     parameter values (event [row] x measurementType [col]) from each dataset.
-#'     \itemize{
-#'       \item \code{`first-datasetID`} (data table)
-#'       \item \code{`second-datasetID`} (data table)
-#'       \item ...
-#'     }
+#'   \item \strong{counts}: Sparse matrices of read counts
+#'     (taxon [row] x event [col]).
+#'   \item \strong{asvs}: Data tables containing ASV sequences and
+#'     taxonomic assignments.
+#'   \item \strong{events}: Data tables with event/sample metadata.
+#'   \item \strong{datasets}: Data tables with dataset-level metadata.
+#'   \item \strong{emof}: Data tables with contextual measurement values.
 #' }
 #'
-#' To inspect individual matrices or data tables:
+#' To inspect individual objects:
 #' \describe{
-#'   \item{\code{loaded <- load_data(data_path = './datasets')}}{}
-#'   \item{\code{View(loaded$emof$`first-datasetID`)}}{}
-#'   \item{\code{# OR (to show first 100 ASVs in first counts matrix):}}{}
-#'   \item{\strong{Memory note:} `counts` is a sparse matrix; converting large
-#'     matrices to dense format (e.g. `as.matrix()`) may exhaust RAM. Only convert
-#'     small subsets for inspection.}{}
-#'   \item{\code{View(as.matrix(loaded$counts[[1]][1:100,]))}}{}
+#'   \item{\code{loaded <- load_data(data_path = "./datasets")}}{}
+#'   \item{\code{View(loaded$emof[[1]])}}{}
+#'   \item{\strong{Memory note:} \code{counts} is a sparse matrix; converting
+#'     large matrices to dense format (e.g. \code{as.matrix()}) may exhaust RAM.
+#'     Only convert small subsets for inspection.}{}
+#'   \item{\code{View(as.matrix(loaded$counts[[1]][1:100, ]))}}{}
 #' }
 #' @export
-load_data <- function(data_path = './datasets') {
+load_data <- function(data_path = "./datasets") {
   
-  # Locate datasets
   if (!dir.exists(data_path)) {
     stop(paste("Path of dataset directory:", data_path, "was not found."))
   }
-  zip_files <- list.files(data_path, pattern = "\\.zip$", full.names = TRUE)
-  if (length(zip_files) == 0) {
-    stop(paste("No ZIP files found in", data_path, "."))
-  }
-  ds_ids <- gsub(".zip", "", basename(zip_files))
-  # Detect e.g. '<datasetID> copy.zip' or '<datasetID> (1).zip'
-  for (id in ds_ids)
-    if (!grepl("^[A-Za-z0-9_\\-]+$", id))
-      stop(paste("Invalid filename detected:", paste0("'",id,".zip'\n"),
-                 "Please resolve before proceeding."))
   
-  # Reads & reshapes occurrence.tsv into sparse (!) and wide (taxonID x eventID) format
-  get_counts <- function(zip) {
-    occurrences <- fread(utils::unzip(zip, files = "occurrence.tsv", 
-                                      exdir = tempdir()))
+  # ---------- Helpers ----------
+  # Robust root detection: find the folder that contains occurrence.tsv + required TSVs.
+  # Works for:
+  # - flat datasets
+  # - datasets inside one or more nested folders
+  # - ZIPs re-packed on macOS (ignores __MACOSX and ._ files)
+  find_dataset_root <- function(dir_path) {
+    
+    occ <- list.files(
+      dir_path,
+      pattern = "^occurrence\\.tsv$",
+      recursive = TRUE,
+      full.names = TRUE
+    )
+    
+    # Ignore macOS metadata artifacts
+    occ <- occ[!grepl("(^|/)__MACOSX(/|$)", occ)]
+    occ <- occ[!grepl("(^|/)\\._", occ)]
+    
+    if (length(occ) == 0) {
+      stop("No occurrence.tsv found under: ", dir_path)
+    }
+    if (length(occ) > 1) {
+      stop(
+        "Multiple occurrence.tsv files found under: ", dir_path,
+        "\nCannot determine unique dataset root."
+      )
+    }
+    
+    root <- dirname(occ)
+    
+    required <- c("asv.tsv", "event.tsv", "emof.tsv")
+    missing <- required[!file.exists(file.path(root, required))]
+    if (length(missing) > 0) {
+      stop(
+        "Dataset root found at ", root,
+        " but missing required files: ",
+        paste(missing, collapse = ", ")
+      )
+    }
+    
+    normalizePath(root, winslash = "/", mustWork = TRUE)
+  }
+  
+  # Resolve source to a root directory containing TSVs.
+  # If zip -> unzip once into a unique temp dir, then find root. If dir -> find root.
+  # IMPORTANT: do NOT clean up temp dirs here; we clean up later in the outer on.exit().
+  resolve_root <- function(source_path) {
+    if (grepl("\\.zip$", source_path, ignore.case = TRUE)) {
+      td <- tempfile("asv_zip_")
+      dir.create(td, showWarnings = FALSE, recursive = TRUE)
+      
+      utils::unzip(source_path, exdir = td)
+      
+      root <- find_dataset_root(td)
+      attr(root, "cleanup_dir") <- td
+      return(root)
+    }
+    
+    if (dir.exists(source_path)) {
+      root <- find_dataset_root(source_path)
+      attr(root, "cleanup_dir") <- NULL
+      return(root)
+    }
+    
+    stop("Source is neither a ZIP nor a directory: ", source_path)
+  }
+  
+  # Read a TSV from root_dir
+  read_tsv <- function(root_dir, filename, ...) {
+    path <- file.path(root_dir, filename)
+    if (!file.exists(path)) {
+      stop("Missing file '", filename, "' in dataset root: ", root_dir)
+    }
+    data.table::fread(
+      path,
+      sep = "\t",
+      quote = "",
+      encoding = "UTF-8",
+      showProgress = FALSE,
+      ...
+    )
+  }
+  
+  # Build dataset id from the source path (ZIP or directory) as supplied by the
+  # user, not from root_dir. root_dir may point to a nested subfolder inside the
+  # source when a ZIP or directory contains a top-level wrapper folder, which
+  # would produce the wrong id.
+  make_id <- function(source_path, root_dir) {
+    if (grepl("\\.zip$", source_path, ignore.case = TRUE)) {
+      return(gsub("\\.zip$", "", basename(source_path), ignore.case = TRUE))
+    }
+    basename(source_path)
+  }
+  
+  validate_ids <- function(ids) {
+    bad <- ids[!grepl("^[A-Za-z0-9_\\-]+$", ids)]
+    if (length(bad) > 0) {
+      stop(
+        "Invalid dataset id(s) detected: ",
+        paste0("'", bad, "'", collapse = ", "),
+        "\nPlease rename ZIP(s)/folder(s) to only use [A-Za-z0-9_-]."
+      )
+    }
+  }
+  
+  # ---------- Discover sources (ZIPs + dataset directories) ----------
+  zip_sources <- list.files(data_path, pattern = "\\.zip$", full.names = TRUE)
+  
+  dir_sources <- list.dirs(data_path, recursive = FALSE, full.names = TRUE)
+  dir_sources <- dir_sources[dir_sources != data_path]
+  
+  # Keep only directories that contain occurrence.tsv somewhere underneath (quick filter)
+  dir_sources <- dir_sources[
+    vapply(dir_sources, function(d) {
+      length(list.files(d, pattern = "^occurrence\\.tsv$", recursive = TRUE)) > 0
+    }, logical(1))
+  ]
+  
+  # ---- De-duplicate: prefer ZIP archives over unzipped folders with same datasetID ----
+  zip_ids <- gsub("\\.zip$", "", basename(zip_sources), ignore.case = TRUE)
+  dir_ids <- basename(dir_sources)
+  duplicate_ids <- intersect(zip_ids, dir_ids)
+  
+  if (length(duplicate_ids) > 0) {
+    message(
+      "Both ZIP archive(s) and unzipped folder(s) found for dataset(s): ",
+      paste(duplicate_ids, collapse = ", "),
+      ". Using ZIP archive(s) and ignoring folder(s)."
+    )
+    dir_sources <- dir_sources[!(dir_ids %in% duplicate_ids)]
+    dir_ids <- basename(dir_sources) # refresh
+  }
+  
+  # ---- Warn if reading any unzipped dataset folders ----
+  if (length(dir_sources) > 0) {
+    warning(
+      "Reading unzipped dataset folder(s). Recommended workflow is to use ",
+      "the original ZIP archives downloaded from the ASV portal.",
+      call. = FALSE
+    )
+  }
+  
+  sources <- c(zip_sources, dir_sources)
+  if (length(sources) == 0) {
+    stop("No ZIP files or dataset directories found in ", data_path, ".")
+  }
+  
+  # ---------- Resolve sources -> root dirs (ZIPs are unzipped once) ----------
+  roots <- lapply(sources, resolve_root)
+  
+  # Clean up temp dirs created for ZIP sources AFTER everything is read
+  on.exit({
+    tds <- unique(Filter(Negate(is.null), lapply(roots, attr, which = "cleanup_dir")))
+    for (td in tds) {
+      if (dir.exists(td)) unlink(td, recursive = TRUE, force = TRUE)
+    }
+  }, add = TRUE)
+  
+  ds_ids <- mapply(make_id, sources, roots, USE.NAMES = FALSE)
+  validate_ids(ds_ids)
+  
+  # ---------- Readers operate on root_dir ----------
+  get_counts <- function(root_dir) {
+    occurrences <- read_tsv(root_dir, "occurrence.tsv")
     occurrences[, taxonID := as.factor(taxonID)]
     occurrences[, eventID := as.factor(eventID)]
     
@@ -92,76 +228,72 @@ load_data <- function(data_path = './datasets') {
     )
     
     rm(occurrences); gc()
-    
-    return(counts)
+    counts
   }
   
-  # Reads ASV sequence and taxonomy from asv.tsv
-  get_asvs <- function(zip) {
-    asvs <- fread(utils::unzip(zip, files = "asv.tsv", exdir = tempfile()))
-    asvs[, dataset_pid := NULL] # Col for admin use only
-    # Replace "" with NA in taxonomy
-    tax_cols <- c("kingdom", "phylum", "order", "class", "family", "genus",
-                  "specificEpithet", "infraspecificEpithet", "otu")       
+  get_asvs <- function(root_dir) {
+    asvs <- read_tsv(root_dir, "asv.tsv")
+    asvs[, dataset_pid := NULL]
+    
+    tax_cols <- c(
+      "kingdom", "phylum", "order", "class", "family", "genus",
+      "specificEpithet", "infraspecificEpithet", "otu"
+    )
+    
     asvs[, (tax_cols) := lapply(.SD, function(x) ifelse(x == "", NA, x)),
          .SDcols = tax_cols]
-    setkey(asvs, taxonID)
-    return(asvs)
+    
+    data.table::setkey(asvs, taxonID)
+    asvs
   }
   
-  # Reads and reshapes events.tsv
-  get_events <- function(zip) {
-    events <- fread(utils::unzip(zip, files = "event.tsv", exdir = tempfile()))
+  get_events <- function(root_dir) {
+    events <- read_tsv(root_dir, "event.tsv")
     events[, c("dataset_pid", "datasetName", "ipt_resource_id") := NULL]
-    setkey(events, eventID)
-    return(events)
+    data.table::setkey(events, eventID)
+    events
   }
   
-  get_datasets <- function(zip) {
+  get_datasets <- function(root_dir) {
     ds_cols <- c("eventID", "datasetName")
-    datasets <- fread(utils::unzip(zip, files = "event.tsv", 
-                                   exdir = tempfile()), select = ds_cols)
-    datasets[, datasetID := strsplit(eventID, ":")[[1]][1]]
+    datasets <- read_tsv(root_dir, "event.tsv", select = ds_cols)
+    
+    datasets[, datasetID := vapply(strsplit(eventID, ":"), `[`, character(1), 1)]
     datasets[, eventID := NULL]
-    setcolorder(datasets, c("datasetID", "datasetName"))
-    datasets <- unique(datasets)
-    return(datasets)
+    
+    data.table::setcolorder(datasets, c("datasetID", "datasetName"))
+    unique(datasets)
   }
   
-  # Reads & reshapes emof.tsv
-  # [eventID x measurementType (measurementUnit)]
-  # and drops remaining fields, e.g.measurementMethod & measurementRemarks!
-  get_emof <- function(zip) {
-    emof <- fread(utils::unzip(zip, files = "emof.tsv", exdir = tempfile()))
-    event_ids <- fread(utils::unzip(zip, files = 'event.tsv', exdir = tempfile()), 
-                       select = "eventID")
-
-    # Handle datasets that have no contextual data
-    if (nrow(emof) == 0) { warning("load_data(): Adding empty emof table for ", 
-                                   gsub("\\.zip$", "", basename(zip)),
-                                   call. = FALSE)
-      emof <- data.table(eventID = event_ids$eventID)
+  get_emof <- function(root_dir) {
+    emof <- read_tsv(root_dir, "emof.tsv")
+    event_ids <- read_tsv(root_dir, "event.tsv", select = "eventID")
+    
+    if (nrow(emof) == 0) {
+      warning("load_data(): Adding empty emof table for ", basename(root_dir), call. = FALSE)
+      emof <- data.table::data.table(eventID = event_ids$eventID)
     } else {
-      emof <- dcast(emof, 
-                    eventID ~ paste0(measurementType, " (", measurementUnit, ")"), 
-                    value.var = "measurementValue")
-      # Include events without data, if any
+      emof <- data.table::dcast(
+        emof,
+        eventID ~ paste0(measurementType, " (", measurementUnit, ")"),
+        value.var = "measurementValue"
+      )
       emof <- merge(event_ids, emof, by = "eventID", all.x = TRUE)
     }
-    setkey(emof, eventID)
-    return(emof)
+    
+    data.table::setkey(emof, eventID)
+    emof
   }
   
-  # Process data into data tables in (sub)lists, and return in parent list
   loaded <- list()
-  loaded$counts <- setNames(lapply(zip_files, get_counts), ds_ids)
-  loaded$asvs <- setNames(lapply(zip_files, get_asvs), ds_ids)
-  loaded$events <- setNames(lapply(zip_files, get_events), ds_ids)
-  loaded$datasets <- setNames(lapply(zip_files, get_datasets), ds_ids)
-  loaded$emof <- setNames(lapply(zip_files, get_emof), ds_ids)
-  return(loaded)
+  loaded$counts   <- stats::setNames(lapply(roots, get_counts), ds_ids)
+  loaded$asvs     <- stats::setNames(lapply(roots, get_asvs), ds_ids)
+  loaded$events   <- stats::setNames(lapply(roots, get_events), ds_ids)
+  loaded$datasets <- stats::setNames(lapply(roots, get_datasets), ds_ids)
+  loaded$emof     <- stats::setNames(lapply(roots, get_emof), ds_ids)
+  
+  loaded
 }
-
 
 # Internal functions to check that input to downstream functions is
 # data table- or matrix-based, and matches the level of complexity accepted by 
@@ -310,8 +442,13 @@ merge_data <- function(loaded, ds = NULL) {
   # Reapplies numeric data type to cols (after merging as char)
   restore_numeric <- function(dt){
     dt[, names(dt) := lapply(.SD, function(col) {
+      if (!is.character(col)) return(col)
       num_value <- suppressWarnings(as.numeric(col))
-      ifelse(is.na(num_value), col, num_value)
+      # Only convert if every non-missing value parsed cleanly - i.e. the
+      # column is genuinely numeric with some NAs, not text. ifelse() would
+      # otherwise coerce the whole column back to character as soon as any
+      # single value (even a pre-existing NA) took the "col" branch.
+      if (all(is.na(num_value) == is.na(col))) num_value else col
     })]
   }
   
@@ -376,93 +513,143 @@ merge_data <- function(loaded, ds = NULL) {
 #' ranks, for each sample in a \code{\link[=load_data]{loaded}} or
 #' \code{\link[=merge_data]{merged}} ASV occurrence dataset.
 #'
-#' @param counts ASV read counts in a taxon [row] x event [col] sparse matrix, 
-#' from a \code{\link[=load_data]{loaded}} or
+#' @param counts ASV read counts in a taxon [row] x event [col] sparse matrix,
+#'   from a \code{\link[=load_data]{loaded}} or
 #'   \code{\link[=merge_data]{merged}} ASV occurrence dataset.
 #' @param asvs A data table containing the DNA sequences and taxonomic assignment
-#'   of ASV:s included in the \code{counts} matrix.
-#' @return A list containing two sub-lists: `raw` and `norm`, each including
-#'   data tables for summed ASV counts at each taxonomic rank.
-#' @usage sum_by_clade(counts, asvs)
-#' @details Sums raw and normalized read counts across ASVs within distinct
-#'   clades, at specified taxonomic ranks, to provide higher-level views of the
-#'   data. The function normalizes ASV read counts by total counts per sample,
-#'   and returns a list of two sub list, each of which contains data tables
-#'   of summed counts for each taxonomic rank:
+#'   of ASVs included in the \code{counts} matrix.
+#' @param convert_to_dt Logical. If \code{TRUE}, attempts to convert summed clade
+#'   matrices to wide \code{data.table}s (clade [row] x event [col]). If \code{FALSE}
+#'   (default), returns sparse matrices.
+#' @param max_cells Maximum allowed number of cells (\code{nrow * ncol}) when
+#'   converting a sparse matrix to a dense wide \code{data.table}. If exceeded,
+#'   conversion is skipped and the sparse matrix is returned instead (with a warning).
+#'
+#' @return A list containing two sub-lists, \code{raw} and \code{norm}. Each
+#'   sub-list contains one element per taxonomic rank. Elements are sparse matrices
+#'   by default, or wide \code{data.table}s if \code{convert_to_dt = TRUE} and the
+#'   size is within \code{max_cells}.
+#'
+#' @usage sum_by_clade(counts, asvs, convert_to_dt = FALSE, max_cells = 5e6)
+#'
+#' @details
+#' Sums raw and normalized read counts across ASVs within distinct clades at each
+#' taxonomic rank to provide higher-level views of the data. Normalization is
+#' performed per sample (column-wise) by total counts.
 #'
 #' \itemize{
-#'   \item \strong{raw}: List of data tables showing raw read counts summed by 
-#'   clade at different taxonomic ranks.
-#'     \itemize{
-#'       \item \code{kingdom} (data table)
-#'       \item ...
-#'       \item \code{species} (data table)
-#'     }
-#'     
-#'   \item \strong{norm}: List of data tables representing normalized read counts 
-#'   summed by clade at different taxonomic ranks.
-#'     \itemize{
-#'       \item \code{kingdom} (data table)
-#'       \item ...
-#'       \item \code{species} (data table)
-#'     }
+#'   \item \strong{raw}: Summed raw read counts by clade.
+#'   \item \strong{norm}: Summed normalized read counts by clade.
 #' }
-#' #' To view an individual table:
+#'
+#' \strong{Memory note:} Summed clade matrices can still be large (clades x samples).
+#' Converting to dense format (wide \code{data.table}) may require substantial RAM.
+#' Prefer sparse output, or inspect small subsets, e.g.
+#' \code{as.matrix(summed$raw$class[1:5, 1:5])}.
+#'
+#' To view an individual result:
 #' \describe{
-#'   \item{\code{loaded <- load_data(data_path = './datasets')}}{}
+#'   \item{\code{loaded <- load_data(data_path = "./datasets")}}{}
 #'   \item{\code{merged <- merge_data(loaded)}}{}
 #'   \item{\code{summed <- sum_by_clade(merged$counts, merged$asvs)}}{}
-#'   \item{\code{View(summed$raw$family)}}{}
+#'   \item{\code{as.matrix(summed$raw$family[1:5, 1:5])}}{}
+#'   \item{\code{summed_dt <- sum_by_clade(merged$counts, merged$asvs, convert_to_dt = TRUE)}}{}
+#'   \item{\code{View(summed_dt$raw$family)}}{}
 #' }
 #' @export
-sum_by_clade <- function(counts, asvs) {
+sum_by_clade <- function(counts, asvs, convert_to_dt = FALSE, max_cells = 5e6) {
   
-  check_input_category(counts, 'sp_mat')
-  check_input_category(asvs, 'dt')
+  check_input_category(counts, "sp_mat")
+  check_input_category(asvs, "dt")
   
   if (!identical(rownames(counts), asvs$taxonID)) {
-    stop("Mismatch detected: 
-         Row names of 'counts' do not match 'taxonID' of 'asvs'. 
-         Please ensure they are identical.")
+    stop(
+      "Mismatch detected:\n",
+      "Row names of 'counts' do not match 'taxonID' of 'asvs'.\n",
+      "Please ensure they are identical."
+    )
   }
   
-  tax_cols <- c('taxonID', 'kingdom', 'phylum', 'class', 'order', 'family', 
-                'genus', 'specificEpithet', 'otu')
+  tax_cols <- c("taxonID", "kingdom", "phylum", "class", "order", "family",
+                "genus", "specificEpithet", "otu")
   taxa <- asvs[, ..tax_cols]
-  taxa[, species := ifelse(is.na(specificEpithet), NA, 
+  taxa[, species := ifelse(is.na(specificEpithet), NA_character_,
                            paste(genus, specificEpithet))]
   taxa[, specificEpithet := NULL]
-  setcolorder(taxa, c(setdiff(names(taxa), 'otu'), 'otu'))
+  setcolorder(taxa, c(setdiff(names(taxa), "otu"), "otu"))
+  
+  skipped <- character(0)
+  
+  mat_to_dt_safe <- function(m, rank_label) {
+    n_cells <- as.numeric(nrow(m)) * as.numeric(ncol(m))
+    if (n_cells > max_cells) {
+      skipped <<- c(skipped, rank_label)
+      return(m)
+    }
+    
+    # Optional one-time note (only once per call)
+    if (!exists(".sum_by_clade_warned_dense", envir = parent.frame(), inherits = FALSE)) {
+      warning(
+        "sum_by_clade(): Converting sparse matrices to dense data.table. ",
+        "This may require substantial RAM for large datasets.",
+        call. = FALSE
+      )
+      assign(".sum_by_clade_warned_dense", TRUE, envir = parent.frame())
+    }
+    
+    data.table::data.table(clade = rownames(m), suppressWarnings(as.matrix(m)))
+  }
   
   clade_sums_raw <- list()
   clade_sums_norm <- list()
   
   for (rank in names(taxa)[-1]) {
-    clades <- ifelse(is.na(taxa[[rank]]), "Unclassified", taxa[[rank]])
+    clades <- ifelse(is.na(taxa[[rank]]), "Unclassified", as.character(taxa[[rank]]))
     
     clade_levels <- unique(clades)
     clade_index <- match(clades, clade_levels)
     
-    # Aggregate using matrix multiplication
-    G <- Matrix::sparseMatrix(i = clade_index, j = seq_along(clades), x = 1,
-                              dims = c(length(clade_levels), length(clades)))
+    # Aggregate using sparse matrix multiplication
+    G <- Matrix::sparseMatrix(
+      i = clade_index,
+      j = seq_along(clades),
+      x = 1,
+      dims = c(length(clade_levels), length(clades))
+    )
+    
     raw_matrix <- G %*% counts
     rownames(raw_matrix) <- clade_levels
     
-    # Normalise
-    norm_matrix <- raw_matrix %*% Matrix::Diagonal(x = 1 / Matrix::colSums(raw_matrix))
+    # Normalise (safe for zero-sum columns)
+    cs <- Matrix::colSums(raw_matrix)
+    inv_cs <- ifelse(cs == 0, 0, 1 / cs)
+    norm_matrix <- raw_matrix %*% Matrix::Diagonal(x = inv_cs)
     colnames(norm_matrix) <- colnames(raw_matrix)
-   
-     # Sort clades
+    
+    # Sort clades
     clade_order <- order(rownames(raw_matrix))
     raw_matrix <- raw_matrix[clade_order, , drop = FALSE]
     norm_matrix <- norm_matrix[clade_order, , drop = FALSE]
     
-    # Convert to dt:s
-    clade_sums_raw[[rank]] <- data.table(clade = rownames(raw_matrix), as.matrix(raw_matrix))
-    clade_sums_norm[[rank]] <- data.table(clade = rownames(norm_matrix), as.matrix(norm_matrix))
+    if (convert_to_dt) {
+      clade_sums_raw[[rank]]  <- mat_to_dt_safe(raw_matrix,  paste0("raw$", rank))
+      clade_sums_norm[[rank]] <- mat_to_dt_safe(norm_matrix, paste0("norm$", rank))
+    } else {
+      clade_sums_raw[[rank]]  <- raw_matrix
+      clade_sums_norm[[rank]] <- norm_matrix
+    }
   }
-  return(list(raw = clade_sums_raw, norm = clade_sums_norm))
+  
+  if (convert_to_dt && length(skipped)) {
+    warning(
+      "sum_by_clade(): Skipped converting large sparse matrices at: ",
+      paste(sort(unique(skipped)), collapse = ", "),
+      ". Returned these as sparse matrices. Increase max_cells to force conversion.",
+      call. = FALSE
+    )
+  }
+  
+  list(raw = clade_sums_raw, norm = clade_sums_norm)
 }
 
 #' Convert tabular ASV data to data.frame format
@@ -472,11 +659,11 @@ sum_by_clade <- function(counts, asvs) {
 #' to a single object or to the (possibly hierarchical) lists returned by
 #' \code{\link[=load_data]{load_data()}} or
 #' \code{\link[=merge_data]{merge_data()}}. Optionally attempts to convert sparse
-#' count matrices.
+#' matrices (typically count matrices).
 #'
 #' @param dt_obj A \code{data.table}, a \code{data.frame}, a sparse matrix (e.g.
 #'   \code{dgCMatrix}), or a (possibly hierarchical) list containing these.
-#' @param convert_counts Logical. If \code{TRUE}, attempts to convert sparse count
+#' @param convert_counts Logical. If \code{TRUE}, attempts to convert sparse
 #'   matrices to \code{data.frame}. If \code{FALSE} (default), sparse matrices are
 #'   left unchanged.
 #' @param max_cells Maximum allowed number of cells (\code{nrow * ncol}) when
@@ -497,14 +684,14 @@ sum_by_clade <- function(counts, asvs) {
 #' size does not exceed \code{max_cells}. Otherwise, they are left unchanged to
 #' avoid excessive memory use.
 #'
-#' \strong{Memory note:} Converting sparse count matrices to dense
+#' \strong{Memory note:} Converting sparse matrices to dense
 #' \code{data.frame}s can require large amounts of RAM. Only enable
 #' \code{convert_counts} for small datasets, or when the resulting object size is
 #' known to be manageable.
 #'
 #' Example usage:
 #' \describe{
-#'   \item{\code{loaded <- load_data(data_path = './datasets')}}{}
+#'   \item{\code{loaded <- load_data(data_path = "./datasets")}}{}
 #'   \item{\code{merged <- merge_data(loaded)}}{}
 #'   \item{\code{merged_df <- convert_to_df(merged)}}{}
 #'   \item{\code{# Attempt counts conversion (may be skipped if too large):}}{}
@@ -529,6 +716,7 @@ convert_to_df <- function(dt_obj, convert_counts = FALSE, max_cells = 5e6) {
   }
   
   skipped <- character(0)
+  dense_warning_issued <- FALSE
   
   contains_convertible <- function(x) {
     if (is_dt(x) || is_spmat(x)) return(TRUE)
@@ -560,7 +748,18 @@ convert_to_df <- function(dt_obj, convert_counts = FALSE, max_cells = 5e6) {
         skipped <<- c(skipped, path)
         return(obj)
       }
-      df <- as.data.frame(as.matrix(obj))
+      
+      if (!dense_warning_issued) {
+        warning(
+          "convert_to_df(): Converting sparse matrices to dense data.frame. ",
+          "This may require substantial RAM for large datasets.",
+          call. = FALSE
+        )
+        dense_warning_issued <<- TRUE
+      }
+      
+      dense_mat <- suppressWarnings(as.matrix(obj))
+      df <- as.data.frame(dense_mat)
       rownames(df) <- rownames(obj)
       return(df)
     }
@@ -599,4 +798,3 @@ convert_to_df <- function(dt_obj, convert_counts = FALSE, max_cells = 5e6) {
   
   result
 }
-

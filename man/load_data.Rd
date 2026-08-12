@@ -4,70 +4,51 @@
 \alias{load_data}
 \title{Load downloaded ASV occurrence data}
 \usage{
-load_data(data_path = './datasets');
+load_data(data_path = "./datasets")
 }
 \arguments{
-\item{data_path}{Path of directory containing dataset (*.zip) files}
+\item{data_path}{Path to a directory containing one or more datasets.
+The recommended workflow is to provide the original, unmodified
+\code{*.zip} archives as downloaded from the ASV portal.}
 }
 \value{
-A list of four sublists (\code{counts}, \code{asvs}, \code{events},
-  \code{emof}) containing sparse matrix or data table elements from each 
-  dataset, indexed by \code{datasetID}.
+A list of five sublists (\code{counts}, \code{asvs}, \code{events},
+  \code{datasets}, \code{emof}) containing sparse matrices or data tables
+  from each dataset, indexed by \code{datasetID}.
 }
 \description{
 Load Amplicon Sequence Variant (ASV) occurrence data from 'Darwin
-Core (DwC)-like' archives downloaded from the Swedish ASP portal,
+Core (DwC)-like' archives downloaded from the Swedish ASV portal,
 \url{https://asv-portal.biodiversitydata.se/}.
 }
 \details{
-Reads data from one or more compressed archives. Returns a list of
-  sub lists, each of which contains sparse matrix or data table 
-  objects from each included dataset:
+The recommended workflow is to use the original ZIP archives downloaded
+from the ASV portal without modification. For compatibility (e.g. browsers that automatically unzip downloads),
+\code{load_data()} can also read already-unzipped dataset folders.
+ZIP archives containing a top-level folder and macOS metadata
+(\code{__MACOSX}, \code{._*}) are handled automatically.
+
+For each dataset, the function locates the dataset root by identifying
+\code{occurrence.tsv} and validating that the required TSV files are present
+in the same directory.
 
 \itemize{
-  \item \strong{counts}: List of sparse matrices representing read counts
-    (taxon [row] x event [col] sparse matrix) from each dataset.
-    \itemize{
-      \item \code{`first-datasetID`} (sparse matrix)
-      \item \code{`second-datasetID`} (sparse matrix)
-      \item ...
-    }
-
-  \item \strong{asvs}: List of data tables containing the DNA sequence and
-    taxonomic assignment of ASVs (taxon [row] x attribute [col]) from each dataset.
-
-    \itemize{
-      \item \code{`first-datasetID`} (data table)
-      \item \code{`second-datasetID`} (data table)
-      \item ...
-    }
-
-  \item \strong{events}: List of data tables representing basic event/sample
-    metadata (event [row] x parameter [col]) from each dataset.
-
-    \itemize{
-      \item \code{`first-datasetID`} (data table)
-      \item \code{`second-datasetID`} (data table)
-      \item ...
-    }
-
-  \item \strong{emof}: List of data tables representing additional contextual
-    parameter values (event [row] x measurementType [col]) from each dataset.
-    \itemize{
-      \item \code{`first-datasetID`} (data table)
-      \item \code{`second-datasetID`} (data table)
-      \item ...
-    }
+  \item \strong{counts}: Sparse matrices of read counts
+    (taxon [row] x event [col]).
+  \item \strong{asvs}: Data tables containing ASV sequences and
+    taxonomic assignments.
+  \item \strong{events}: Data tables with event/sample metadata.
+  \item \strong{datasets}: Data tables with dataset-level metadata.
+  \item \strong{emof}: Data tables with contextual measurement values.
 }
 
-To inspect individual matrices or data tables:
+To inspect individual objects:
 \describe{
-  \item{\code{loaded <- load_data(data_path = './datasets')}}{}
-  \item{\code{View(loaded$emof$`first-datasetID`)}}{}
-  \item{\code{# OR (to show first 100 ASVs in first counts matrix):}}{}
-  \item{\strong{Memory note:} `counts` is a sparse matrix; converting large
-    matrices to dense format (e.g. `as.matrix()`) may exhaust RAM. Only convert
-    small subsets for inspection.}{}
-  \item{\code{View(as.matrix(loaded$counts[[1]][1:100,]))}}{}
+  \item{\code{loaded <- load_data(data_path = "./datasets")}}{}
+  \item{\code{View(loaded$emof[[1]])}}{}
+  \item{\strong{Memory note:} \code{counts} is a sparse matrix; converting
+    large matrices to dense format (e.g. \code{as.matrix()}) may exhaust RAM.
+    Only convert small subsets for inspection.}{}
+  \item{\code{View(as.matrix(loaded$counts[[1]][1:100, ]))}}{}
 }
 }

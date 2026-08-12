@@ -4,19 +4,29 @@
 \alias{sum_by_clade}
 \title{Sum counts by clade within taxonomic ranks}
 \usage{
-sum_by_clade(counts, asvs)
+sum_by_clade(counts, asvs, convert_to_dt = FALSE, max_cells = 5e6)
 }
 \arguments{
-\item{counts}{ASV read counts in a taxon [row] x event [col] sparse matrix, 
+\item{counts}{ASV read counts in a taxon [row] x event [col] sparse matrix,
 from a \code{\link[=load_data]{loaded}} or
-  \code{\link[=merge_data]{merged}} ASV occurrence dataset.}
+\code{\link[=merge_data]{merged}} ASV occurrence dataset.}
 
 \item{asvs}{A data table containing the DNA sequences and taxonomic assignment
-of ASV:s included in the \code{counts} matrix.}
+of ASVs included in the \code{counts} matrix.}
+
+\item{convert_to_dt}{Logical. If \code{TRUE}, attempts to convert summed clade
+matrices to wide \code{data.table}s (clade [row] x event [col]). If \code{FALSE}
+(default), returns sparse matrices.}
+
+\item{max_cells}{Maximum allowed number of cells (\code{nrow * ncol}) when
+converting a sparse matrix to a dense wide \code{data.table}. If exceeded,
+conversion is skipped and the sparse matrix is returned instead (with a warning).}
 }
 \value{
-A list containing two sub-lists: `raw` and `norm`, each including
-  data tables for summed ASV counts at each taxonomic rank.
+A list containing two sub-lists, \code{raw} and \code{norm}. Each
+  sub-list contains one element per taxonomic rank. Elements are sparse matrices
+  by default, or wide \code{data.table}s if \code{convert_to_dt = TRUE} and the
+  size is within \code{max_cells}.
 }
 \description{
 Sum raw and normalized ASV counts by distinct clades at different taxonomic
@@ -24,34 +34,27 @@ ranks, for each sample in a \code{\link[=load_data]{loaded}} or
 \code{\link[=merge_data]{merged}} ASV occurrence dataset.
 }
 \details{
-Sums raw and normalized read counts across ASVs within distinct
-  clades, at specified taxonomic ranks, to provide higher-level views of the
-  data. The function normalizes ASV read counts by total counts per sample,
-  and returns a list of two sub list, each of which contains data tables
-  of summed counts for each taxonomic rank:
+Sums raw and normalized read counts across ASVs within distinct clades at each
+taxonomic rank to provide higher-level views of the data. Normalization is
+performed per sample (column-wise) by total counts.
 
 \itemize{
-  \item \strong{raw}: List of data tables showing raw read counts summed by 
-  clade at different taxonomic ranks.
-    \itemize{
-      \item \code{kingdom} (data table)
-      \item ...
-      \item \code{species} (data table)
-    }
-    
-  \item \strong{norm}: List of data tables representing normalized read counts 
-  summed by clade at different taxonomic ranks.
-    \itemize{
-      \item \code{kingdom} (data table)
-      \item ...
-      \item \code{species} (data table)
-    }
+  \item \strong{raw}: Summed raw read counts by clade.
+  \item \strong{norm}: Summed normalized read counts by clade.
 }
-#' To view an individual table:
+
+\strong{Memory note:} Summed clade matrices can still be large (clades x samples).
+Converting to dense format (wide \code{data.table}) may require substantial RAM.
+Prefer sparse output, or inspect small subsets, e.g.
+\code{as.matrix(summed$raw$class[1:5, 1:5])}.
+
+To view an individual result:
 \describe{
-  \item{\code{loaded <- load_data(data_path = './datasets')}}{}
+  \item{\code{loaded <- load_data(data_path = "./datasets")}}{}
   \item{\code{merged <- merge_data(loaded)}}{}
   \item{\code{summed <- sum_by_clade(merged$counts, merged$asvs)}}{}
-  \item{\code{View(summed$raw$family)}}{}
+  \item{\code{as.matrix(summed$raw$family[1:5, 1:5])}}{}
+  \item{\code{summed_dt <- sum_by_clade(merged$counts, merged$asvs, convert_to_dt = TRUE)}}{}
+  \item{\code{View(summed_dt$raw$family)}}{}
 }
 }

@@ -1,3 +1,6 @@
+skip_if_not_installed("duckdb")
+skip_if_not_installed("DBI")
+
 two_datasets <- function(env = parent.frame()) {
   data_path <- withr::local_tempdir(.local_envir = env)
   make_dataset(data_path, "DS-A", n_events = 3, asv_from = 1, n_asvs = 5)
@@ -88,7 +91,7 @@ test_that("an ASV in two datasets has one row in each, with the same taxonID", {
   expect_setequal(asv$datasetID[asv$taxonID == shared[1]], c("DS-A", "DS-B"))
 })
 
-test_that("event keeps all columns of load_data and a cell that starts with an unclosed quote does not swallow rows", {
+test_that("event keeps all columns of load_data, reads quoted values and treats \"\" as missing", {
   data_path <- two_datasets()
   out <- convert(data_path)
   loaded <- load_data(data_path)
@@ -97,7 +100,7 @@ test_that("event keeps all columns of load_data and a cell that starts with an u
   expect_equal(nrow(event), 3 + 4)
   expect_setequal(setdiff(names(event), "datasetID"), names(loaded$events[["DS-A"]]))
   expect_true(all(event$remarks == "\"Niskin, 5 m"))
-  expect_true(all(event$sop == "\"\""))
+  expect_true(all(is.na(event$sop)))
 })
 
 test_that("emof stays long, one row per event and measurement, with the value kept as text", {

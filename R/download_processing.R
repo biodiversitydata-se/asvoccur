@@ -56,14 +56,21 @@ load_data <- function(data_path = "./datasets") {
     if (!file.exists(path)) {
       stop("Missing file '", filename, "' in dataset root: ", root_dir)
     }
-    data.table::fread(
+    dt <- data.table::fread(
       path,
       sep = "\t",
-      quote = "",
+      quote = "\"",
       encoding = "UTF-8",
       showProgress = FALSE,
       ...
     )
+    # fread keeps the doubled quotes of quoted CSV values, e.g. "a ""b""" as a ""b"".
+    text_cols <- names(dt)[vapply(dt, is.character, logical(1))]
+    if (length(text_cols) > 0) {
+      dt[, (text_cols) := lapply(.SD, gsub, pattern = "\"\"", replacement = "\"", fixed = TRUE),
+         .SDcols = text_cols]
+    }
+    dt
   }
 
   roots <- lapply(sources, resolve_root)

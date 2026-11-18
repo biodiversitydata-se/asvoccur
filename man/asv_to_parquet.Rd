@@ -32,6 +32,8 @@ The conversion is done by DuckDB straight from the TSV files, so no dataset
 is read into R and memory use does not grow with the size of a dataset.
 }
 \details{
+Requires the suggested packages \pkg{duckdb} and \pkg{DBI}.
+
 One directory per table is written to \code{out_dir}, each Hive-partitioned
 by \code{datasetID}, e.g.
 \code{out_dir/occurrence/datasetID=KTH-2013-Baltic-16S/data.parquet}:

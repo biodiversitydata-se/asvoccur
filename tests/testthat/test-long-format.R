@@ -138,3 +138,20 @@ test_that("values with quotes, tabs and line breaks are read as the portal wrote
   loaded <- load_data(data_path)
   expect_equal(loaded$events[["DS-Q"]]$note, tricky)
 })
+
+test_that("merge_long() ignores dataset-specific ASV attributes, as merge_data() does", {
+  data_path <- withr::local_tempdir()
+  make_dataset(data_path, "DS-A", n_events = 2, asv_from = 1, n_asvs = 3)
+  make_dataset(data_path, "DS-B", as = "dir", n_events = 2, asv_from = 2, n_asvs = 3)
+  asv_path <- file.path(data_path, "DS-B", "asv.tsv")
+  asv <- data.table::fread(asv_path, sep = "\t", colClasses = "character")
+  asv$asv_id_alias <- paste0("provider_", seq_len(nrow(asv)))
+  asv$previousIdentifications <- "Bacteria|Other"
+  write_tsv(asv, asv_path)
+
+  merged <- expect_no_warning(merge_long(suppressWarnings(open_long(data_path))))
+  asvs <- as.data.frame(merged$asvs)
+  expect_null(merged$iasvs)
+  expect_equal(sort(asvs$taxonID), asv_ids(4))
+  expect_false(any(c("asv_id_alias", "previousIdentifications") %in% names(asvs)))
+})

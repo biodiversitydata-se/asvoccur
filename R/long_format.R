@@ -86,16 +86,22 @@ load_long <- function(data_path = NULL, store, overwrite = FALSE) {
 #'     measurement, with values as text.
 #'   \item \strong{events}: Data frame of sample metadata, in memory.
 #'   \item \strong{datasets}: Data frame of dataset IDs and names.
-#'   \item \strong{iasvs}: Data frame of ASVs whose attributes differ between
+#'   \item \strong{iasvs}: Data frame of ASVs whose taxonomy differs between
 #'     datasets, or \code{NULL} if there are none.
 #' }
 #'
 #' @details
 #' As in \code{\link{merge_data}()}, events found in more than one dataset give an
-#' error, and ASVs whose attributes differ between datasets, typically because they
+#' error, and ASVs whose taxonomy differs between datasets, typically because they
 #' were downloaded before and after a re-annotation, give a warning. Such ASVs have
 #' one row per version in \code{asvs}, which must be resolved before summing by
 #' clade.
+#'
+#' Also as in \code{\link{merge_data}()}, \code{asvs} only has the attributes
+#' that describe the ASV itself. Dataset-specific ones, such as
+#' \code{asv_id_alias}, \code{associatedSequences} and
+#' \code{previousIdentifications}, are in \code{loaded$asvs}, with one row per
+#' dataset.
 #'
 #' @examples
 #' \dontrun{
@@ -136,14 +142,18 @@ merge_long <- function(loaded, ds = NULL) {
   rownames(events) <- NULL
 
   asv_rows <- in_ds(loaded$asvs)
+  # As in merge_data(), only attributes that describe the ASV itself are combined;
+  # dataset-specific ones such as asv_id_alias stay in loaded$asvs.
+  shared_cols <- intersect(asv_shared_cols, colnames(loaded$asvs))
   # duckplyr cannot translate paste(), so species is built in SQL.
   asvs <- duckplyr::read_sql_duckdb(
     sprintf(
-      "SELECT DISTINCT * EXCLUDE (datasetID),
+      "SELECT DISTINCT %s,
          CASE WHEN specificEpithet IS NOT NULL THEN genus || ' ' || specificEpithet END
            AS species
        FROM read_parquet(%s, hive_partitioning = true, hive_types_autocast = false)
        WHERE datasetID IN (%s)",
+      paste(sql_identifier(shared_cols), collapse = ", "),
       sql_string(file.path(loaded$store, "asv", "*", "*.parquet")),
       paste(sql_string(ds), collapse = ", ")
     ),
@@ -287,6 +297,18 @@ check_packages <- function(needed) {
 sql_string <- function(x) {
   paste0("'", gsub("'", "''", x, fixed = TRUE), "'")
 }
+
+sql_identifier <- function(x) {
+  paste0('"', gsub('"', '""', x, fixed = TRUE), '"')
+}
+
+# The ASV attributes that merge_data() combines across datasets.
+asv_shared_cols <- c(
+  "taxonID", "DNA_sequence", "scientificName", "taxonRank",
+  "kingdom", "phylum", "order", "class", "family", "genus",
+  "specificEpithet", "infraspecificEpithet", "otu",
+  "identificationReferences", "identificationRemarks"
+)
 
 stored_ids <- function(store) {
   dirs <- Sys.glob(file.path(store, "dataset", "datasetID=*"))

@@ -23,7 +23,7 @@ A list with:
     measurement, with values as text.
   \item \strong{events}: Data frame of sample metadata, in memory.
   \item \strong{datasets}: Data frame of dataset IDs and names.
-  \item \strong{iasvs}: Data frame of ASVs whose attributes differ between
+  \item \strong{iasvs}: Data frame of ASVs whose taxonomy differs between
     datasets, or \code{NULL} if there are none.
 }
 }
@@ -34,10 +34,16 @@ Read counts, ASVs and contextual measurements stay lazy tables.
 }
 \details{
 As in \code{\link{merge_data}()}, events found in more than one dataset give an
-error, and ASVs whose attributes differ between datasets, typically because they
+error, and ASVs whose taxonomy differs between datasets, typically because they
 were downloaded before and after a re-annotation, give a warning. Such ASVs have
 one row per version in \code{asvs}, which must be resolved before summing by
 clade.
+
+Also as in \code{\link{merge_data}()}, \code{asvs} only has the attributes
+that describe the ASV itself. Dataset-specific ones, such as
+\code{asv_id_alias}, \code{associatedSequences} and
+\code{previousIdentifications}, are in \code{loaded$asvs}, with one row per
+dataset.
 }
 \examples{
 \dontrun{

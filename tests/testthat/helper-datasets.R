@@ -1,5 +1,16 @@
+# Writes a TSV file as the portal's exporter does, with PostgreSQL's COPY ... WITH CSV:
+# empty strings and values with a quote, tab or line break are quoted, with quotes
+# doubled, and NA is an empty, unquoted field.
 write_tsv <- function(df, path) {
-  utils::write.table(df, path, sep = "\t", quote = FALSE, row.names = FALSE, na = "")
+  quote_field <- function(v) {
+    out <- as.character(v)
+    needs <- !is.na(out) & (out == "" | grepl("[\"\t\n\r]", out))
+    out[needs] <- paste0("\"", gsub("\"", "\"\"", out[needs], fixed = TRUE), "\"")
+    out[is.na(out)] <- ""
+    out
+  }
+  body <- if (nrow(df) > 0) do.call(paste, c(lapply(df, quote_field), sep = "\t"))
+  writeLines(c(paste(names(df), collapse = "\t"), body), path, useBytes = TRUE)
 }
 
 asv_ids <- function(n) sprintf("ASV:%032x", seq_len(n))
@@ -20,7 +31,7 @@ write_dataset_files <- function(root, id, n_events = 3, asv_from = 1, n_asvs = 5
     locationID = "L1", decimalLatitude = 55.185, coordinateUncertaintyInMeters = NA,
     materialSampleID = "https://example.org/sample", references = "ref",
     pcr_primer_name_forward = "515F",
-    sop = "\"\"", remarks = "\"Niskin, 5 m", stringsAsFactors = FALSE
+    sop = "", remarks = "\"Niskin, 5 m", stringsAsFactors = FALSE
   )
   for (nm in names(extra_event)) event[[nm]] <- extra_event[[nm]]
   occurrence <- expand.grid(taxonID = taxa, eventID = events, stringsAsFactors = FALSE)

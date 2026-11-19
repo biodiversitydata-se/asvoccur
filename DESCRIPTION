@@ -6,12 +6,14 @@ Author: The SBDI Molecular Data Team
 Description: This package provides functions for handling ASV occurrence data in SBDI.
 Imports:
     data.table,
-    DBI,
-    duckdb,
     Matrix,
     stats
-RoxygenNote: 7.3.3
 Suggests:
+    DBI,
+    dplyr,
+    duckdb,
+    duckplyr,
+    rlang,
     testthat (>= 3.0.0),
     withr,
     zip
@@ -19,3 +21,4 @@ Config/testthat/edition: 3
 Encoding: UTF-8
 Maintainer: Maria Prager <maria.prager@scilifelab.se>
 License: MIT + file LICENSE
+Config/roxygen2/version: 8.0.0

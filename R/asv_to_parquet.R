@@ -17,6 +17,8 @@
 #' @return \code{out_dir}, invisibly.
 #'
 #' @details
+#' Requires the suggested packages \pkg{duckdb} and \pkg{DBI}.
+#'
 #' One directory per table is written to \code{out_dir}, each Hive-partitioned
 #' by \code{datasetID}, e.g.
 #' \code{out_dir/occurrence/datasetID=KTH-2013-Baltic-16S/data.parquet}:
@@ -52,6 +54,7 @@
 #' \code{out_dir} if any dataset fails.
 #' @export
 asv_to_parquet <- function(data_path = "./datasets", out_dir, name_convert = c("none", "ecolongr")) {
+  check_packages(c("duckdb", "DBI"))
   name_convert <- match.arg(name_convert)
   key <- if (name_convert == "ecolongr") "dataset_id" else "datasetID"
   sources <- list_sources(data_path)
@@ -127,11 +130,12 @@ convert_source <- function(con, source, id, staging, key, name_convert) {
   }
 }
 
-# All columns are read as text so a column has the same type in every dataset;
-# quoting is off because the files hold stray quote characters.
+# All columns are read as text so a column has the same type in every dataset.
+# The portal writes its TSV files in PostgreSQL's CSV mode: empty strings appear
+# as "", and values with quotes, tabs or line breaks are quoted with quotes doubled.
 read_tsv_sql <- function(con, path) {
   sprintf(
-    "read_csv(%s, delim = '\\t', quote = '', header = true, all_varchar = true)",
+    "read_csv(%s, delim = '\\t', quote = '\"', escape = '\"', header = true, all_varchar = true)",
     DBI::dbQuoteString(con, path)
   )
 }

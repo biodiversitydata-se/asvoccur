@@ -1,5 +1,5 @@
 # Four ASVs in two samples. t1, t2 share genus G1; t3 has genus G2; t4 has no genus.
-# Only t1 and t3 have a specificEpithet.
+# t1 and t3 have a specificEpithet, and t4 has one without a genus.
 clade_input <- function() {
   asvs <- data.table::data.table(
     taxonID = c("t1", "t2", "t3", "t4"),
@@ -9,7 +9,7 @@ clade_input <- function() {
     order = c("O1", "O1", "O2", NA),
     family = c("F1", "F1", "F2", NA),
     genus = c("G1", "G1", "G2", NA),
-    specificEpithet = c("sp1", NA, "sp3", NA),
+    specificEpithet = c("sp1", NA, "sp3", "sp4"),
     otu = c("Otu1", NA, NA, NA)
   )
   counts <- sparse(asvs$taxonID, c("s1", "s2"), c(1, 2, 3, 4, 5, 0, 7, 8))
@@ -37,7 +37,7 @@ test_that("raw sums the counts of the ASVs in a clade, with NA as 'Unclassified'
   expect_equal(as.matrix(raw$otu), matrix(c(1, 5, 9, 15), nrow = 2, byrow = TRUE, dimnames = list(c("Otu1", "Unclassified"), c("s1", "s2"))))
 })
 
-test_that("species is 'genus specificEpithet', and an ASV without an epithet is unclassified", {
+test_that("species is 'genus specificEpithet', and an ASV without epithet or genus is unclassified", {
   x <- clade_input()
   species <- sum_by_clade(x$counts, x$asvs)$raw$species
 

@@ -56,14 +56,21 @@ load_data <- function(data_path = "./datasets") {
     if (!file.exists(path)) {
       stop("Missing file '", filename, "' in dataset root: ", root_dir)
     }
-    data.table::fread(
+    dt <- data.table::fread(
       path,
       sep = "\t",
-      quote = "",
+      quote = "\"",
       encoding = "UTF-8",
       showProgress = FALSE,
       ...
     )
+    # fread keeps the doubled quotes of quoted CSV values, e.g. "a ""b""" as a ""b"".
+    text_cols <- names(dt)[vapply(dt, is.character, logical(1))]
+    if (length(text_cols) > 0) {
+      dt[, (text_cols) := lapply(.SD, gsub, pattern = "\"\"", replacement = "\"", fixed = TRUE),
+         .SDcols = text_cols]
+    }
+    dt
   }
 
   roots <- lapply(sources, resolve_root)
@@ -436,7 +443,8 @@ sum_by_clade <- function(counts, asvs, convert_to_dt = FALSE, max_cells = 5e6) {
   tax_cols <- c("taxonID", "kingdom", "phylum", "class", "order", "family",
                 "genus", "specificEpithet", "otu")
   taxa <- asvs[, ..tax_cols]
-  taxa[, species := ifelse(is.na(specificEpithet), NA_character_,
+  # An epithet without a genus is not a species name, so such ASVs are unclassified.
+  taxa[, species := ifelse(is.na(genus) | is.na(specificEpithet), NA_character_,
                            paste(genus, specificEpithet))]
   taxa[, specificEpithet := NULL]
   setcolorder(taxa, c(setdiff(names(taxa), "otu"), "otu"))

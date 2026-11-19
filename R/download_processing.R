@@ -443,7 +443,8 @@ sum_by_clade <- function(counts, asvs, convert_to_dt = FALSE, max_cells = 5e6) {
   tax_cols <- c("taxonID", "kingdom", "phylum", "class", "order", "family",
                 "genus", "specificEpithet", "otu")
   taxa <- asvs[, ..tax_cols]
-  taxa[, species := ifelse(is.na(specificEpithet), NA_character_,
+  # An epithet without a genus is not a species name, so such ASVs are unclassified.
+  taxa[, species := ifelse(is.na(genus) | is.na(specificEpithet), NA_character_,
                            paste(genus, specificEpithet))]
   taxa[, specificEpithet := NULL]
   setcolorder(taxa, c(setdiff(names(taxa), "otu"), "otu"))

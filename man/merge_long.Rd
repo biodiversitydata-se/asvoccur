@@ -18,7 +18,7 @@ A list with:
   \item \strong{counts}: Lazy table of read counts (\code{eventID},
     \code{taxonID}, \code{organismQuantity}), without zeros.
   \item \strong{asvs}: Lazy table with one row per ASV: sequence, taxonomy and
-    \code{species}, which is genus and epithet combined.
+    \code{species}, as in \code{loaded$asvs}.
   \item \strong{emof}: Lazy table of contextual measurements, one row per
     measurement, with values as text.
   \item \strong{events}: Data frame of sample metadata, in memory.

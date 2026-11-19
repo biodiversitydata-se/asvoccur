@@ -10,18 +10,23 @@ load_long(data_path = NULL, store, overwrite = FALSE)
 \item{data_path}{Path to a directory with datasets downloaded from the portal,
 as for \code{\link{load_data}()}, or \code{NULL} to only open \code{store}.}
 
-\item{store}{Directory with the Parquet tables. Datasets in \code{data_path}
-that are not in \code{store} are converted with \code{\link{asv_to_parquet}()}
-first. A store can be prepared once and shared between users.}
+\item{store}{Directory with the Parquet tables. If any dataset in
+\code{data_path} is missing from \code{store}, all datasets in
+\code{data_path} are converted with \code{\link{asv_to_parquet}()} first.
+If all of them are in \code{store}, the stored copies are used and a message
+says so. A store can be prepared once and shared between users.}
 
 \item{overwrite}{Logical. If \code{TRUE}, convert the datasets in
-\code{data_path} again even if they are in \code{store}.}
+\code{data_path} again even if they are in \code{store}. Use this after
+downloading a new version of a stored dataset, e.g. after a re-annotation.}
 }
 \value{
 A list of lazy tables with one row per value and a \code{datasetID}
   column: \code{counts} (\code{eventID}, \code{taxonID},
   \code{organismQuantity}), \code{asvs}, \code{events} and \code{emof}, plus
   \code{datasets}, a data frame of dataset IDs and names, and \code{store}.
+  \code{asvs} has a \code{species} column, which is genus and epithet
+  combined, or \code{NA} if either is missing.
 }
 \description{
 Open datasets downloaded from the Swedish ASV portal,

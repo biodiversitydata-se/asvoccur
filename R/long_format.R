@@ -8,16 +8,21 @@
 #'
 #' @param data_path Path to a directory with datasets downloaded from the portal,
 #'   as for \code{\link{load_data}()}, or \code{NULL} to only open \code{store}.
-#' @param store Directory with the Parquet tables. Datasets in \code{data_path}
-#'   that are not in \code{store} are converted with \code{\link{asv_to_parquet}()}
-#'   first. A store can be prepared once and shared between users.
+#' @param store Directory with the Parquet tables. If any dataset in
+#'   \code{data_path} is missing from \code{store}, all datasets in
+#'   \code{data_path} are converted with \code{\link{asv_to_parquet}()} first.
+#'   If all of them are in \code{store}, the stored copies are used and a message
+#'   says so. A store can be prepared once and shared between users.
 #' @param overwrite Logical. If \code{TRUE}, convert the datasets in
-#'   \code{data_path} again even if they are in \code{store}.
+#'   \code{data_path} again even if they are in \code{store}. Use this after
+#'   downloading a new version of a stored dataset, e.g. after a re-annotation.
 #'
 #' @return A list of lazy tables with one row per value and a \code{datasetID}
 #'   column: \code{counts} (\code{eventID}, \code{taxonID},
 #'   \code{organismQuantity}), \code{asvs}, \code{events} and \code{emof}, plus
 #'   \code{datasets}, a data frame of dataset IDs and names, and \code{store}.
+#'   \code{asvs} has a \code{species} column, which is genus and epithet
+#'   combined, or \code{NA} if either is missing.
 #'
 #' @details
 #' Requires the suggested packages \pkg{duckdb}, \pkg{duckplyr}, \pkg{DBI},
@@ -40,6 +45,11 @@ load_long <- function(data_path = NULL, store, overwrite = FALSE) {
     ids <- vapply(sources, make_id, character(1), USE.NAMES = FALSE)
     if (overwrite || !all(ids %in% stored_ids(store))) {
       asv_to_parquet(data_path, store)
+    } else {
+      message(
+        "Using the stored copies in '", store, "' of: ", paste(ids, collapse = ", "),
+        ". Use overwrite = TRUE to convert a newer download of a dataset."
+      )
     }
   }
   if (length(Sys.glob(file.path(store, "*", "dataset_id=*"))) > 0) {
@@ -58,7 +68,7 @@ load_long <- function(data_path = NULL, store, overwrite = FALSE) {
 
   list(
     counts = read_store(store, "occurrence"),
-    asvs = read_store(store, "asv"),
+    asvs = read_asvs(store),
     events = read_store(store, "event"),
     emof = read_store(store, "emof"),
     datasets = datasets,
@@ -81,7 +91,7 @@ load_long <- function(data_path = NULL, store, overwrite = FALSE) {
 #'   \item \strong{counts}: Lazy table of read counts (\code{eventID},
 #'     \code{taxonID}, \code{organismQuantity}), without zeros.
 #'   \item \strong{asvs}: Lazy table with one row per ASV: sequence, taxonomy and
-#'     \code{species}, which is genus and epithet combined.
+#'     \code{species}, as in \code{loaded$asvs}.
 #'   \item \strong{emof}: Lazy table of contextual measurements, one row per
 #'     measurement, with values as text.
 #'   \item \strong{events}: Data frame of sample metadata, in memory.
@@ -144,21 +154,8 @@ merge_long <- function(loaded, ds = NULL) {
   asv_rows <- in_ds(loaded$asvs)
   # As in merge_data(), only attributes that describe the ASV itself are combined;
   # dataset-specific ones such as asv_id_alias stay in loaded$asvs.
-  shared_cols <- intersect(asv_shared_cols, colnames(loaded$asvs))
-  # duckplyr cannot translate paste(), so species is built in SQL.
-  asvs <- duckplyr::read_sql_duckdb(
-    sprintf(
-      "SELECT DISTINCT %s,
-         CASE WHEN specificEpithet IS NOT NULL THEN genus || ' ' || specificEpithet END
-           AS species
-       FROM read_parquet(%s, hive_partitioning = true, hive_types_autocast = false)
-       WHERE datasetID IN (%s)",
-      paste(sql_identifier(shared_cols), collapse = ", "),
-      sql_string(file.path(loaded$store, "asv", "*", "*.parquet")),
-      paste(sql_string(ds), collapse = ", ")
-    ),
-    prudence = "stingy"
-  )
+  shared_cols <- intersect(c(asv_shared_cols, "species"), colnames(loaded$asvs))
+  asvs <- dplyr::distinct(dplyr::select(asv_rows, dplyr::all_of(shared_cols)))
 
   conflicts <- dplyr::filter(
     dplyr::summarise(asvs, n = dplyr::n(), .by = "taxonID"),
@@ -298,10 +295,6 @@ sql_string <- function(x) {
   paste0("'", gsub("'", "''", x, fixed = TRUE), "'")
 }
 
-sql_identifier <- function(x) {
-  paste0('"', gsub('"', '""', x, fixed = TRUE), '"')
-}
-
 # The ASV attributes that merge_data() combines across datasets.
 asv_shared_cols <- c(
   "taxonID", "DNA_sequence", "scientificName", "taxonRank",
@@ -313,6 +306,21 @@ asv_shared_cols <- c(
 stored_ids <- function(store) {
   dirs <- Sys.glob(file.path(store, "dataset", "datasetID=*"))
   sub("^datasetID=", "", basename(dirs))
+}
+
+# duckplyr cannot translate paste(), so species is built in SQL. As in
+# sum_by_clade(), an epithet without a genus gives no species.
+read_asvs <- function(store) {
+  duckplyr::read_sql_duckdb(
+    sprintf(
+      "SELECT *,
+         CASE WHEN genus IS NOT NULL AND specificEpithet IS NOT NULL
+           THEN genus || ' ' || specificEpithet END AS species
+       FROM read_parquet(%s, hive_partitioning = true, hive_types_autocast = false)",
+      sql_string(file.path(store, "asv", "*", "*.parquet"))
+    ),
+    prudence = "stingy"
+  )
 }
 
 read_store <- function(store, table) {

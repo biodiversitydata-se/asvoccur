@@ -24,9 +24,19 @@ test_that("load_long() converts the downloads once and returns lazy tables", {
   expect_equal(loaded$datasets$datasetID, c("DS-A", "DS-B"))
 
   stamp <- file.mtime(Sys.glob(file.path(store, "occurrence", "*", "*.parquet")))
-  again <- load_long(data_path, store = store)
+  expect_message(again <- load_long(data_path, store = store), "stored copies.*DS-A, DS-B")
   expect_equal(file.mtime(Sys.glob(file.path(store, "occurrence", "*", "*.parquet"))), stamp)
   expect_equal(again$datasets, loaded$datasets)
+})
+
+test_that("load_long() converts all downloads again if one is missing from the store", {
+  data_path <- two_datasets()
+  store <- file.path(withr::local_tempdir(), "store")
+  load_long(data_path, store = store)
+  make_dataset(data_path, "DS-C", n_events = 2)
+
+  expect_no_message(loaded <- load_long(data_path, store = store))
+  expect_equal(loaded$datasets$datasetID, c("DS-A", "DS-B", "DS-C"))
 })
 
 test_that("load_long() opens an existing store without the downloads", {
@@ -91,8 +101,7 @@ test_that("merge_long() warns about ASVs with inconsistent taxonomy", {
   expect_error(sum_clades_long(merged$counts, merged$asvs), "more than one row")
 })
 
-test_that("sum_clades_long() matches sum_by_clade() at every rank", {
-  data_path <- two_datasets()
+expect_same_clade_sums <- function(data_path) {
   merged <- merge_long(open_long(data_path))
   wide <- merge_data(load_data(data_path))
   # sum_by_clade() needs exactly the ASVs of the count matrix, in the same order.
@@ -110,7 +119,29 @@ test_that("sum_clades_long() matches sum_by_clade() at every rank", {
       expect_equal(obs$norm[i], norm[obs$clade[i], obs$eventID[i]])
     }
     expect_equal(sum(as.numeric(obs$raw)), sum(raw))
+    expect_equal(nrow(obs), sum(raw != 0))
   }
+}
+
+test_that("sum_clades_long() matches sum_by_clade() at every rank", {
+  expect_same_clade_sums(two_datasets())
+})
+
+test_that("species is genus and epithet, and NA without either, as in sum_by_clade()", {
+  data_path <- withr::local_tempdir()
+  make_dataset(data_path, "DS-A", as = "dir", n_events = 3, n_asvs = 5)
+  asv_path <- file.path(data_path, "DS-A", "asv.tsv")
+  asv <- data.table::fread(asv_path, sep = "\t", colClasses = "character")
+  asv$genus <- c("Gen", "Gen", "Other", "", "Gen")
+  asv$specificEpithet <- c("alpha", "beta", "alpha", "alpha", "")
+  write_tsv(asv, asv_path)
+
+  loaded <- suppressWarnings(open_long(data_path))
+  expect_equal(
+    sorted(as.data.frame(merge_long(loaded)$asvs), "taxonID")$species,
+    c("Gen alpha", "Gen beta", "Other alpha", NA, NA)
+  )
+  suppressWarnings(expect_same_clade_sums(data_path))
 })
 
 test_that("sum_clades_long() respects a filtered table and stays lazy", {

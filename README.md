@@ -10,7 +10,7 @@ The **asvoccur** R package, currently under development, provides tools for unpa
 - **Wide format** (`load_data()`, `merge_data()`, `sum_by_clade()`): builds ASV tables with one column per sample, as sparse matrices.
 
 ## Tutorial
-See our [tutorial](https://biodiversitydata-se.github.io/sbdi-days-eDNA/tutorial.html) for an example workflow using **asvoccur** with ASV portal data in R.
+See our [tutorial](https://biodiversitydata-se.github.io/sbdi-eDNA-smn/tutorial.html) for example workflows with ASV portal data in R: one track uses the wide format, and one uses the long format with ecolongr.
 
 ## Install
 ```R

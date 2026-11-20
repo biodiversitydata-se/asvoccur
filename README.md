@@ -6,8 +6,8 @@ See [Releases](https://github.com/biodiversitydata-se/asvoccur/releases) for the
 ## Overview
 The **asvoccur** R package, currently under development, provides tools for unpacking and processing ASV occurrence data and metadata downloaded from [the Swedish ASV portal](http://asv-portal.biodiversitydata.se/). It offers two ways to work with the data:
 
-- **Long format** (`load_long()`, `merge_long()`, `sum_clades_long()`): keeps the data in the long format it is delivered in, with one row per ASV and sample, stores it as Parquet and queries it with DuckDB without reading it into memory. Suited for large datasets, and for analyses with [ecolongr](https://github.com/biodiversitydata-se/ecolongr).
 - **Wide format** (`load_data()`, `merge_data()`, `sum_by_clade()`): builds ASV tables with one column per sample, as sparse matrices.
+- **Long format** (`load_long()`, `merge_long()`, `sum_clades_long()`): keeps the data in the long format it is delivered in, with one row per ASV and sample, stores it as Parquet and queries it with DuckDB without reading it into memory. Suited for large datasets, and for analyses with [ecolongr](https://github.com/biodiversitydata-se/ecolongr).
 
 ## Tutorial
 See our [tutorial](https://biodiversitydata-se.github.io/sbdi-eDNA-smn/tutorial.html) for example workflows with ASV portal data in R: one track uses the wide format, and one uses the long format with ecolongr.
@@ -34,6 +34,17 @@ remotes::install_github("biodiversitydata-se/asvoccur", force = TRUE)
 ## Run
 Download the datasets' ZIP archives from the ASV portal and put them in one folder.
 
+### Wide format
+```R
+library(asvoccur)
+
+data_path <- '/path-to/dataset-folder'
+loaded <- load_data(data_path)
+merged <- merge_data(loaded)
+summed <- sum_by_clade(merged$counts, merged$asvs)
+summed_df <- convert_to_df(summed)
+```
+
 ### Long format
 ```R
 library(asvoccur)
@@ -59,15 +70,6 @@ d <- merged$counts |>
 
 # d is a dist object: use vegan on it.
 ordination <- vegan::metaMDS(d)
-```
-
-### Wide format
-```R
-data_path <- '/path-to/dataset-folder'
-loaded <- load_data(data_path)
-merged <- merge_data(loaded)
-summed <- sum_by_clade(merged$counts, merged$asvs)
-summed_df <- convert_to_df(summed)
 ```
 
 ### Parquet tables
